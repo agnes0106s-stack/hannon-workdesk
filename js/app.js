@@ -16,7 +16,7 @@ const VIEWS = {
 };
 const state = {
   view: VIEWS[storageGet('hannon.view')] ? storageGet('hannon.view') : 'tasks',
-  project: 'all', query: '', archivedNotes: false, note: null, meetingId: null, draft: null,
+  project: 'all', query: '', archivedNotes: false, noteCategory: 'all', note: null, meetingId: null, draft: null,
   expanded: null, taskDraft: '', dragging: null
 };
 let dbx, store, uploads, recorder = null, recordingMeta = null, toastTimer;
@@ -95,7 +95,7 @@ function updateChrome() {
     nav.append(b);
   });
   const [title, desc] = VIEWS[state.view];
-  $('#page-title').textContent = state.project !== 'all' && ['overview', 'tasks', 'done', 'notes'].includes(state.view) ? projectOf(state.project).name + ' · ' + title : title;
+  $('#page-title').textContent = state.project !== 'all' && ['overview', 'tasks', 'done'].includes(state.view) ? projectOf(state.project).name + ' · ' + title : title;
   $('#page-description').textContent = desc;
   const heading = $('#heading-action');
   heading.replaceChildren();
@@ -150,7 +150,7 @@ function setProject(id) {
   state.project = id;
   document.body.classList.remove('mobile-projects-open');
   $('#mobile-project-toggle').setAttribute('aria-expanded', 'false');
-  if (state.view === 'meetings') state.view = 'tasks';
+  if (state.view === 'meetings' || state.view === 'notes') { state.view = 'tasks'; state.note = null; }
   render();
 }
 
@@ -411,7 +411,7 @@ function saveNote() {
   n.dirty = false;
   n.saving = (n.saving || 0) + 1;
   const version = ++n.saves;
-  const args = { id: n.id, title: n.title, body: n.body, project: n.project, archived: n.archived, baseRevision: n.baseRevision, copyId: 'note-' + hex(8) };
+  const args = { id: n.id, title: n.title, body: n.body, category: n.category, archived: n.archived, baseRevision: n.baseRevision, copyId: 'note-' + hex(8) };
   noteStatus(store.queue.offline || !store.online ? '오프라인 · 연결되면 저장돼요' : '저장 중…');
   const p = store.queue.enqueue('noteSave', args).then(result => {
     n.saving--;
@@ -447,7 +447,7 @@ function noteChanged() {
   const n = state.note;
   n.title = $('#note-title').value;
   n.body = $('#note-body').value;
-  n.project = $('#note-project').value;
+  n.category = $('#note-category').value.trim();
   n.dirty = true;
   noteStatus('저장 대기…');
   clearTimeout(noteTimer);
@@ -458,25 +458,54 @@ async function newNote() {
   state.view = 'notes';
   storageSet('hannon.view', 'notes');
   state.archivedNotes = false;
-  state.note = { id: 'note-' + hex(8), title: '', body: '', project: state.project === 'all' ? 'inbox' : state.project, archived: false, baseRevision: 0, isNew: true, dirty: false, saves: 0 };
+  state.note = { id: 'note-' + hex(8), title: '', body: '', category: ['all', ''].includes(state.noteCategory) ? '' : state.noteCategory, archived: false, baseRevision: 0, isNew: true, dirty: false, saves: 0 };
   render();
   $('#note-title')?.focus();
 }
 async function selectNote(note) {
   await saveNote();
-  state.note = { id: note.id, title: note.title, body: note.body, project: note.project, archived: !!note.archived, baseRevision: note.revision, isNew: false, dirty: false, saves: 0 };
+  state.note = { id: note.id, title: note.title, body: note.body, category: note.category || '', archived: !!note.archived, baseRevision: note.revision, isNew: false, dirty: false, saves: 0 };
   renderNotes($('#content'));
   if (window.matchMedia('(max-width: 650px)').matches) $('.note-editor')?.scrollIntoView({ block: 'start' });
+}
+function noteCategories() {
+  return [...new Set(Object.values(store.choices().notes || {}).map(n => String(n?.category || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ko'));
+}
+/** 메모 위의 카테고리 칩: 전체 · 사용자가 만든 카테고리 · 분류 없음. */
+function noteCategoryBar(c) {
+  const bar = el('div', 'note-categories');
+  const cats = noteCategories();
+  const notes = Object.values(store.choices().notes || {}).filter(n => n && !!n.archived === state.archivedNotes);
+  if (!cats.length) { state.noteCategory = 'all'; return bar; }
+  const count = cat => notes.filter(n => (n.category || '') === cat).length;
+  const pick = cat => async () => { await saveNote(); state.noteCategory = cat; state.note = null; renderNotes(c); };
+  bar.append(button('전체 ' + notes.length, 'filter' + (state.noteCategory === 'all' ? ' active' : ''), pick('all')));
+  cats.forEach(cat => bar.append(button(cat + ' ' + count(cat), 'filter' + (state.noteCategory === cat ? ' active' : ''), pick(cat))));
+  if (count('')) bar.append(button('분류 없음 ' + count(''), 'filter' + (state.noteCategory === '' ? ' active' : ''), pick('')));
+  return bar;
+}
+function noteCategoryInput(value) {
+  const wrap = el('label', 'note-category-field'), input = el('input', 'note-category'), list = el('datalist');
+  input.id = 'note-category'; input.value = value; input.maxLength = 40;
+  input.placeholder = '카테고리 (예: 가족, 아이디어)';
+  input.setAttribute('aria-label', '메모 카테고리');
+  list.id = 'note-category-options';
+  noteCategories().forEach(cat => { const o = el('option'); o.value = cat; list.append(o); });
+  input.setAttribute('list', list.id);
+  input.addEventListener('input', noteChanged);
+  wrap.append(input, list);
+  return wrap;
 }
 function renderNoteList() {
   const list = $('#note-list');
   if (!list) return;
+  $('.note-categories')?.replaceWith(noteCategoryBar($('#content')));
   list.replaceChildren();
   const notes = Object.values(store.choices().notes || {}).filter(n => n && typeof n === 'object');
-  const rows = notes.filter(n => inProject(n) && !!n.archived === state.archivedNotes && matches(n.title, n.body)).sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
+  const rows = notes.filter(n => !!n.archived === state.archivedNotes && (state.noteCategory === 'all' || (n.category || '') === state.noteCategory) && matches(n.title, n.body, n.category || '')).sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
   rows.forEach(n => {
     const b = button('', 'note-list-item' + (n.id === state.note?.id ? ' active' : ''), () => selectNote(n));
-    b.append(el('strong', '', n.title || '새 메모'), el('p', '', (n.body || '').slice(0, 75) || '내용 없는 메모'), el('span', '', shortDate(n.updatedAt) + ' · ' + projectOf(n.project).name));
+    b.append(el('strong', '', n.title || '새 메모'), el('p', '', (n.body || '').slice(0, 75) || '내용 없는 메모'), el('span', '', shortDate(n.updatedAt) + (n.category ? ' · ' + n.category : '')));
     list.append(b);
   });
   if (!rows.length) list.append(el('p', 'small-empty', state.archivedNotes ? '보관한 메모가 없어요.' : '아직 메모가 없어요.'));
@@ -489,9 +518,9 @@ function refreshNoteEditor() {
   const title = $('#note-title'), body = $('#note-body');
   if (!title || !body || document.activeElement === title || document.activeElement === body) return;
   // 편집 중이 아니면 다른 기기에서 바뀐 최신본을 그대로 보여준다.
-  Object.assign(n, { title: latest.title, body: latest.body, project: latest.project, archived: !!latest.archived, baseRevision: latest.revision });
+  Object.assign(n, { title: latest.title, body: latest.body, category: latest.category || '', archived: !!latest.archived, baseRevision: latest.revision });
   title.value = n.title; body.value = n.body;
-  const sel = $('#note-project'); if (sel) sel.value = n.project;
+  const cat = $('#note-category'); if (cat) cat.value = n.category;
   noteStatus('다른 기기에서 바뀐 내용을 불러왔어요');
 }
 function renderNotes(c) {
@@ -504,7 +533,7 @@ function renderNotes(c) {
   );
   const list = el('div');
   list.id = 'note-list';
-  sidebar.append(tabs, list);
+  sidebar.append(tabs, noteCategoryBar(c), list);
   const editor = el('div', 'note-editor');
   layout.append(sidebar, editor);
   c.append(layout);
@@ -518,8 +547,7 @@ function renderNotes(c) {
   }
   const controls = el('div', 'note-controls');
   const back = button('← 목록', 'text-button note-back', async () => { await saveNote(); state.note = null; renderNotes(c); });
-  const select = projectSelect(n.project, 'note-project');
-  select.addEventListener('change', noteChanged);
+  const select = noteCategoryInput(n.category || '');
   const status = el('span', 'save-status', n.dirty ? '저장 대기…' : n.isNew ? '새 메모' : '자동 저장됨');
   status.id = 'note-save-status';
   status.setAttribute('role', 'status');
@@ -538,7 +566,7 @@ function renderNotes(c) {
       await saveNote();
       const t = (n.title || n.body.split('\n')[0] || '').trim();
       if (!t) { notify('먼저 메모를 적어주세요.'); return; }
-      store.queue.enqueue('taskCreate', { id: 'manual-' + hex(8), title: t.slice(0, 300), project: n.project, createdAt: new Date().toISOString() }).catch(e => notify(e.message));
+      store.queue.enqueue('taskCreate', { id: 'manual-' + hex(8), title: t.slice(0, 300), project: 'inbox', createdAt: new Date().toISOString() }).catch(e => notify(e.message));
       notify('할 일 목록에 추가했어요.' + offlineSuffix());
     }),
     button(n.archived ? '메모로 복원' : '메모 보관', 'text-button', async () => {

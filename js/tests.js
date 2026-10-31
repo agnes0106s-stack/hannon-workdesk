@@ -70,6 +70,15 @@ test('noteSave: 새 메모·제한·변경 없음', () => {
   throws(() => OPS.noteSave(c, { id: 'note-aaaaaaaaaaaaaaaa', title: 't', body: 'x'.repeat(20001), baseRevision: 1 }, {}), ValidationError);
   throws(() => OPS.noteSave(c, { id: 'note-aaaaaaaaaaaaaaaa', title: 'x'.repeat(201), body: '', baseRevision: 1 }, {}), ValidationError);
 });
+test('noteSave: 카테고리는 직접 적고, 프로젝트는 고르지 않음', () => {
+  const c = normalizeChoices({});
+  const r = OPS.noteSave(c, { id: 'note-aaaaaaaaaaaaaaaa', title: '책 검수', body: '본문', category: ' 가족 ', project: 'hongkong', baseRevision: 0 }, { projectIds: new Set(['inbox', 'hongkong']) });
+  eq(r.note.category, '가족'); eq(r.note.project, 'inbox');
+  const r2 = OPS.noteSave(c, { id: 'note-aaaaaaaaaaaaaaaa', title: '책 검수', body: '본문', baseRevision: 1 }, {});
+  eq(r2, NO_CHANGE, '카테고리를 안 보내면 기존 값 유지');
+  eq(OPS.noteSave(c, { id: 'note-aaaaaaaaaaaaaaaa', title: '책 검수', body: '본문', category: '', baseRevision: 1 }, {}).note.category, '');
+  throws(() => OPS.noteSave(c, { id: 'note-aaaaaaaaaaaaaaaa', title: 't', body: '', category: 'x'.repeat(41), baseRevision: 2 }, {}), ValidationError);
+});
 test('noteSave: 최신본이 바뀌고 본문도 다르면 충돌 사본, 같으면 그냥 저장', () => {
   const c = normalizeChoices({ notes: { 'note-aaaaaaaaaaaaaaaa': { id: 'note-aaaaaaaaaaaaaaaa', title: '제목', body: '다른 기기 본문', project: 'inbox', revision: 3, archived: false, updatedAt: '' } } });
   const r = OPS.noteSave(c, { id: 'note-aaaaaaaaaaaaaaaa', title: '제목', body: '내 본문', baseRevision: 2, copyId: 'note-bbbbbbbbbbbbbbbb' }, {});

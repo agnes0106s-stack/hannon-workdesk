@@ -109,18 +109,21 @@ export const choiceOps = {
     if (typeof body !== 'string' || body.length > 20000 || title.length > 200) throw new ValidationError('제목은 200자, 내용은 20,000자까지 저장할 수 있어요.');
     if (!/^note-[0-9a-f]{16}$/.test(args.id || '')) throw new ValidationError('메모 ID가 올바르지 않아요.');
     const existing = doc.notes[args.id];
-    const project = knownProject(args.project ?? existing?.project ?? 'inbox', ctx);
+    // 메모는 프로젝트에 묶지 않는다. 카테고리는 사용자가 직접 적는다('' = 분류 없음).
+    const category = args.category ?? existing?.category ?? '';
+    if (typeof category !== 'string' || category.trim().length > 40) throw new ValidationError('카테고리는 40자까지 적을 수 있어요.');
+    const project = 'inbox';
     const archived = args.archived ?? existing?.archived ?? false;
     if (existing && existing.revision !== args.baseRevision && existing.body !== body) {
       const copyId = args.copyId;
       if (!/^note-[0-9a-f]{16}$/.test(copyId || '')) throw new ValidationError('메모 ID가 올바르지 않아요.');
       const copy = doc.notes[copyId];
       if (copy && copy.body === body) return { conflictCopy: copyId, note: copy };
-      doc.notes[copyId] = { id: copyId, title: (title || '새 메모') + ' (충돌 사본)', body, project, updatedAt: nowIso(), revision: (copy?.revision || 0) + 1, archived: false };
+      doc.notes[copyId] = { id: copyId, title: (title || '새 메모') + ' (충돌 사본)', body, category: category.trim(), project, updatedAt: nowIso(), revision: (copy?.revision || 0) + 1, archived: false };
       return { conflictCopy: copyId, note: doc.notes[copyId] };
     }
-    const next = { id: args.id, title: title || '새 메모', body, project, archived: !!archived };
-    if (existing && existing.title === next.title && existing.body === body && existing.project === project && !!existing.archived === next.archived) return NO_CHANGE;
+    const next = { id: args.id, title: title || '새 메모', body, category: category.trim(), project, archived: !!archived };
+    if (existing && existing.title === next.title && existing.body === body && (existing.category || '') === next.category && existing.project === project && !!existing.archived === next.archived) return NO_CHANGE;
     doc.notes[args.id] = { ...next, updatedAt: nowIso(), revision: (existing?.revision || 0) + 1 };
     return { note: doc.notes[args.id] };
   }

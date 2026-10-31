@@ -333,3 +333,6 @@ dialog::backdrop{background:#24344a40;backdrop-filter:blur(3px)}
 @media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 /* tests.html */
 .tests{max-width:860px;padding:32px 20px}.tests h1{font-size:24px;margin-bottom:8px}.test-results{font-size:13px;line-height:1.9;padding-left:22px}.test-results .pass{color:#4f7a5d}.test-results .fail{color:#a1503c;font-weight:600}
+.note-categories{display:flex;flex-wrap:wrap;gap:4px;margin:-4px 0 12px}.note-categories .filter{font-size:11px;padding:5px 9px}
+.note-category-field{display:flex}.note-category{border:1px solid var(--line);border-radius:7px;padding:7px 9px;background:var(--paper,#fff);font:inherit;font-size:12px;width:200px;max-width:100%}.note-category::placeholder{color:#aab2bd}
+@media(max-width:650px){.note-category{width:150px;font-size:16px}}
