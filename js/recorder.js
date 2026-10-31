@@ -153,6 +153,19 @@ export class UploadStore {
   async all() { if (!(await this.open())) return [...this.memory.values()]; return (await this.tx('readonly', s => s.getAll())) || []; }
 }
 
+/** 고른 파일의 앞부분으로 형식을 알아낸다(맥 meeting_store 와 같은 기준). 모르는 형식이면 null. */
+export async function sniffAudio(file) {
+  const h = new Uint8Array(await file.slice(0, 32).arrayBuffer());
+  const s = (from, text) => [...text].every((c, i) => h[from + i] === c.charCodeAt(0));
+  if (h.length < 12) return null;
+  if (s(4, 'ftyp')) return { contentType: 'audio/mp4', ext: 'm4a' };
+  if (h[0] === 0x1a && h[1] === 0x45 && h[2] === 0xdf && h[3] === 0xa3) return { contentType: 'audio/webm', ext: 'webm' };
+  if ((s(0, 'RIFF') || s(0, 'RF64')) && s(8, 'WAVE')) return { contentType: 'audio/wav', ext: 'wav' };
+  if (s(0, 'OggS')) return { contentType: 'audio/ogg', ext: 'ogg' };
+  if (s(0, 'ID3') || (h[0] === 0xff && (h[1] & 0xe0) === 0xe0 && !/\.aac$/i.test(file.name))) return { contentType: 'audio/mpeg', ext: 'mp3' };
+  return null;
+}
+
 /** 설명 JSON(규격의 inbox 형식). */
 export function describe({ uploadId, contentType, ext, size, meetingId, title, date, region, language }) {
   return {

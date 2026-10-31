@@ -4,7 +4,7 @@ import { RealDropbox, startLogin, finishLoginIfReturning, hasToken } from './dro
 import { MockDropbox } from './mock.js';
 import { DataStore } from './data.js';
 import { taskState, meetingPath, FieldConflict, ValidationError } from './ops.js';
-import { Recorder, UploadStore, uploadRecording, describe, newUploadId, isIOS, pickType } from './recorder.js';
+import { Recorder, UploadStore, uploadRecording, describe, newUploadId, isIOS, pickType, sniffAudio } from './recorder.js';
 
 const MOCK = new URLSearchParams(location.search).get('mock') === '1';
 const VIEWS = {
@@ -905,10 +905,7 @@ function openRecorder(meetingId = null) {
   if (recorder) { notify('이미 녹음 중이에요.'); return; }
   const body = openDialog('새 녹음');
   const type = pickType();
-  if (!type || !navigator.mediaDevices?.getUserMedia) {
-    body.append(el('p', 'dialog-text', '이 브라우저에서는 녹음할 수 없어요. 아이폰은 사파리, 맥은 사파리나 크롬 최신 버전에서 열어주세요.'));
-    return;
-  }
+  const canRecord = !!(type && navigator.mediaDevices?.getUserMedia);
   const form = el('form', 'record-form');
   const field = (label, control) => { const l = el('label', 'meeting-field'); l.append(el('span', '', label), control); return l; };
   const meetingSel = el('select');
@@ -934,15 +931,21 @@ function openRecorder(meetingId = null) {
   const grid = el('div', 'meeting-notice-fields');
   grid.append(field('어느 회의에', meetingSel), titleField, dateField, field('지역', region), field('언어', language));
   form.append(grid);
+  if (!canRecord) form.append(el('p', 'dialog-text', '이 브라우저에서는 바로 녹음할 수 없어요. 녹음 파일 올리기는 할 수 있어요.'));
   const warn = el('div', 'record-warning');
   warn.append(el('strong', '', isIOS() ? '아이폰에서 녹음할 때' : '녹음할 때'), el('p', '', '아이폰 사파리는 화면이 잠기거나 다른 앱으로 넘어가면 녹음이 멈춰요. 녹음이 끝날 때까지 이 화면을 켜 두세요.' + ('wakeLock' in navigator ? ' 녹음하는 동안 화면이 자동으로 꺼지지 않게 해 둘게요.' : ' 이 기기는 화면 켜 두기를 지원하지 않아요. 설정 › 디스플레이 › 자동 잠금을 잠시 ‘안 함’으로 바꿔 주세요.')));
-  form.append(warn);
+  if (canRecord) form.append(warn);
   if (store.macState() !== 'on') form.append(el('p', 'meeting-muted', '맥이 꺼져 있어도 녹음은 드롭박스에 올라가요. 맥이 켜지면 받아쓰기·요약돼요.'));
-  form.append(el('p', 'meeting-muted', '녹음 형식: ' + (type.contentType === 'audio/mp4' ? 'M4A' : type.contentType.replace('audio/', '').toUpperCase())));
+  if (canRecord) form.append(el('p', 'meeting-muted', '녹음 형식: ' + (type.contentType === 'audio/mp4' ? 'M4A' : type.contentType.replace('audio/', '').toUpperCase())));
   const row = el('div', 'meeting-notice-actions');
   const start = el('button', 'primary-button', '녹음 시작');
-  start.type = 'submit';
-  row.append(start, button('닫기', 'text-button', closeDialog));
+  start.type = 'submit'; start.hidden = !canRecord;
+  const picker = el('input'); picker.type = 'file'; picker.multiple = true; picker.hidden = true;
+  picker.accept = 'audio/*,.m4a,.mp4,.mp3,.wav,.ogg,.opus,.webm';
+  const chosenMeta = () => ({ meetingId: meetingSel.value || null, title: title.value, date: date.value || localDay(), region: region.value, language: language.value });
+  picker.addEventListener('change', () => { const files = [...picker.files]; picker.value = ''; if (files.length) { closeDialog(); uploadFiles(files, chosenMeta()); } });
+  row.append(start, button('녹음 파일 올리기', canRecord ? 'secondary-button' : 'primary-button', () => picker.click()), button('닫기', 'text-button', closeDialog), picker);
+  form.append(el('p', 'meeting-muted', '음성 메모·파일 앱의 녹음(M4A, MP3, WAV, OGG, WebM)도 올릴 수 있어요. 여러 개를 고르면 따로따로 회의에 붙어요.'));
   form.append(row);
   form.addEventListener('submit', async e => {
     e.preventDefault();
@@ -999,6 +1002,19 @@ async function finishRecording() {
   recordingMeta = null;
   if (result.blob.size > 100 * 1024 * 1024) notify('녹음이 100MB를 넘어요. 맥에서 처리하지 못할 수 있어요.');
   await runUpload(item);
+}
+async function uploadFiles(files, meta) {
+  for (const file of files) {
+    const kind = await sniffAudio(file).catch(() => null);
+    if (!kind) { notify(file.name + ': 지원하지 않는 형식이에요. M4A·MP3·WAV·OGG·WebM 파일을 골라주세요.'); continue; }
+    if (file.size > 100 * 1024 * 1024) notify(file.name + ': 100MB를 넘어요. 맥에서 처리하지 못할 수 있어요.');
+    const uploadId = newUploadId();
+    const name = file.name.replace(/\.[^.]+$/, '');
+    const fileMeta = { ...meta, title: meta.meetingId ? '' : (files.length > 1 || !meta.title.trim() ? name : meta.title) };
+    const item = { uploadId, blob: file, meta: describe({ uploadId, contentType: kind.contentType, ext: kind.ext, size: file.size, ...fileMeta }), audioDone: false, savedAt: Date.now() };
+    await uploads.put(item);
+    if (!(await runUpload(item))) break;
+  }
 }
 let uploading = false;
 async function runUpload(item) {
