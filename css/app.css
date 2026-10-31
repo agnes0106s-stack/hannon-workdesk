@@ -357,3 +357,26 @@ dialog::backdrop{background:#24344a40;backdrop-filter:blur(3px)}
 .suggestion-tabs{display:flex;gap:6px;margin-bottom:12px}
 .brief-button{margin:4px 0 12px}
 @media(max-width:650px){.suggestion-card{padding:12px}.brief-text{max-height:50vh}}
+.home-brief{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
+.brief-column{display:flex;flex-direction:column;gap:16px;min-width:0}
+.brief-card{border:1px solid #e5e9ee;border-radius:10px;background:#fff;padding:14px 16px}
+.brief-head{display:flex;align-items:center;gap:8px;margin-bottom:8px;color:#6f7d8c}
+.brief-head h2{font-size:13px;font-weight:600;color:#3d4a59;margin:0;flex:1}
+.brief-row{display:flex;justify-content:space-between;align-items:baseline;gap:12px;width:100%;text-align:left;padding:7px 6px;border-radius:6px;background:none;border:0}
+button.brief-row:hover{background:#f4f6f9}
+.brief-text-line{font-size:13px;color:#3d4a59;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.brief-meta{font-size:11px;color:#a0a7b1;flex-shrink:0}
+.brief-more{font-size:11px;color:#a0a7b1;margin:4px 6px 0}
+.decision-list{display:flex;flex-direction:column;gap:22px;max-width:780px}
+.decision-row{border-bottom:1px solid #eef1f4;padding:10px 0;display:flex;flex-direction:column;gap:6px}
+.decision-top{display:flex;gap:12px;align-items:baseline}
+.decision-top time{font-size:11px;color:#a0a7b1;flex-shrink:0;width:74px}
+.decision-top strong{font-size:14px;font-weight:600;color:#2f3a46}
+.final-badge{display:inline-block;font-size:10px;font-weight:600;color:#8a6a2f;background:#f6efe2;border-radius:4px;padding:1px 6px;margin-bottom:4px}
+.final-strip{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 0 12px}
+.final-link{font-size:12px;color:#455c74;background:#f6efe2;border-radius:6px;padding:4px 9px;border:0}
+.suggestion-kind.move{background:#eaf3ee;color:#3f6b52}
+.content.view-home .brief-card+.brief-card,.content.view-home>.brief-card{margin-top:12px}
+.decision-quote{margin:0;padding:3px 10px;border-left:3px solid #dfe5ec;font-size:12px;color:#5f6b78}
+.final-toggle{margin-left:8px;font-size:11px}
+.file-row .final-badge{margin-right:6px}

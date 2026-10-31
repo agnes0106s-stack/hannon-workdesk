@@ -97,6 +97,18 @@ test('suggestionAct: 승인 전엔 목록에 없고, 승인하면 할 일·결�
   throws(() => OPS.suggestionAct(c, { id: 'sug-zzzz', action: 'approve' }, ctx), ValidationError);
   throws(() => OPS.suggestionAct(c, { id: 'sug-aaaaaaaaaaaaaaaa', action: 'delete' }, ctx), ValidationError);
 });
+test('suggestionAct: 대화 옮기기 승인은 대화의 프로젝트만 바꿈', () => {
+  const c = normalizeChoices({ suggestions: { 'sug-dddddddddddddddd': { id: 'sug-dddddddddddddddd', kind: 'move', text: '옮기기', project: 'taiwan', source: { type: 'conversation', id: 'chat-1' }, state: 'new' } } });
+  OPS.suggestionAct(c, { id: 'sug-dddddddddddddddd', action: 'approve' }, { projectIds: new Set(['inbox', 'taiwan']) });
+  eq(c.activityProjects['chat-1'], 'taiwan'); eq(allTasks([], c).length, 0); eq(Object.keys(c.decisions).length, 0);
+});
+test('finalToggle: 최종본 표시·빼기, 같은 상태면 그대로', () => {
+  const c = normalizeChoices({});
+  OPS.finalToggle(c, { id: 'f1', final: true }); assert('f1' in c.finals);
+  eq(OPS.finalToggle(c, { id: 'f1', final: true }), NO_CHANGE);
+  OPS.finalToggle(c, { id: 'f1', final: false }); assert(!('f1' in c.finals));
+  throws(() => OPS.finalToggle(c, { id: '', final: true }), ValidationError);
+});
 test('suggestionAct: 버리면 남아 있고 되돌릴 수 있음', () => {
   const c = normalizeChoices({ suggestions: { 'sug-cccccccccccccccc': { id: 'sug-cccccccccccccccc', kind: 'task', text: '샘플', project: 'inbox', state: 'new' } } });
   OPS.suggestionAct(c, { id: 'sug-cccccccccccccccc', action: 'dismiss' }, {});

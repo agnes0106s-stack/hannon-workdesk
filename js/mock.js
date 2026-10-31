@@ -222,7 +222,7 @@ function seedFixtures(db) {
     { id: 's2', project: 'sample-a', source: 'Codex', at: iso(now - day), title: '예시 비교표 정리', fileIds: ['f2', 'f3'] },
     { id: 's3', project: 'sample-b', source: 'Claude Code', at: iso(now - 3 * day), title: '예시 문구 점검', fileIds: ['f4', 'f5'] }
   ];
-  const index = { apiVersion: 2, appId: 'hannon', scannedAt: iso(now - 3 * 3600000), projects, files, activities, tasks: indexTasks, choices: { ...choices, revision: 11 }, briefs: { 'sample-a': '# 샘플 프로젝트 A · 이어서 하기\n(예시 요약)\n\n## 지금 상황\n- 단계: 일정 조율\n\n## 남은 할 일\n- [확정] 홍길동 님에게 일정 확인 연락하기' }, warnings: [], sources: { Codex: 1, 'Claude Code': 2 } };
+  const index = { apiVersion: 2, appId: 'hannon', scannedAt: iso(now - 3 * 3600000), projects, files, activities, tasks: indexTasks, choices: { ...choices, revision: 11 }, radar: { staleProjects: [{ project: 'sample-b', name: '샘플 프로젝트 B', days: 15, openTasks: 1 }], oldTasks: [], inboxFiles: 2, inboxChats: 1, newSuggestions: 2 }, briefs: { 'sample-a': '# 샘플 프로젝트 A · 이어서 하기\n(예시 요약)\n\n## 지금 상황\n- 단계: 일정 조율\n\n## 남은 할 일\n- [확정] 홍길동 님에게 일정 확인 연락하기' }, warnings: [], sources: { Codex: 1, 'Claude Code': 2 } };
   db.put('/workdesk/index.json', JSON.stringify(index, null, 2), { silent: true });
   db.put('/workdesk/choices.json', JSON.stringify(choices, null, 2), { silent: true });
   // 맥이 3시간 전에 마지막으로 보였다 → "맥이 꺼져 있어요"

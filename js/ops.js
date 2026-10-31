@@ -25,12 +25,12 @@ export const MAX_TEXT_CHARS = 250000;
 const nowIso = () => new Date().toISOString();
 
 export function emptyChoices() {
-  return { favorites: [], tasks: {}, notes: {}, savedTasks: {}, suggestions: {}, decisions: {}, taskOrder: [], revision: 0 };
+  return { favorites: [], tasks: {}, notes: {}, savedTasks: {}, suggestions: {}, decisions: {}, activityProjects: {}, fileProjects: {}, finals: {}, conversationReads: {}, taskOrder: [], revision: 0 };
 }
 export function normalizeChoices(doc) {
   const d = doc && typeof doc === 'object' && !Array.isArray(doc) ? doc : emptyChoices();
   if (!Array.isArray(d.favorites)) d.favorites = [];
-  for (const key of ['tasks', 'notes', 'savedTasks', 'suggestions', 'decisions']) if (!d[key] || typeof d[key] !== 'object' || Array.isArray(d[key])) d[key] = {};
+  for (const key of ['tasks', 'notes', 'savedTasks', 'suggestions', 'decisions', 'activityProjects', 'fileProjects', 'finals', 'conversationReads']) if (!d[key] || typeof d[key] !== 'object' || Array.isArray(d[key])) d[key] = {};
   if (!Array.isArray(d.taskOrder)) d.taskOrder = [];
   if (!Number.isInteger(d.revision)) d.revision = 0;
   return d;
@@ -147,7 +147,11 @@ export const choiceOps = {
     const project = knownProject(args.project ?? item.project, ctx);
     const source = item.source || {};
     let result;
-    if (item.kind === 'task') {
+    if (item.kind === 'move') {
+      if (source.type !== 'conversation' || !source.id) throw new ValidationError('옮길 대화를 찾지 못했어요.');
+      result = source.id;
+      doc.activityProjects[result] = project;
+    } else if (item.kind === 'task') {
       result = 'task-' + key.slice(4);
       doc.savedTasks[result] = { id: result, title: text, project, kind: 'confirmed', createdAt: nowIso(), basis: '제안 승인 · ' + (source.title || ''), evidence: (item.evidence || []).join(' / ').slice(0, 500), suggestion: key };
       if (!doc.taskOrder.includes(result)) doc.taskOrder.unshift(result);
@@ -157,6 +161,14 @@ export const choiceOps = {
     }
     Object.assign(item, { state: 'approved', text, project, projectGuess: false, result, decidedAt: nowIso() });
     return { suggestion: item };
+  },
+  /** /api/final: 결과물을 최종본으로 표시하거나 뺀다. */
+  finalToggle(doc, args) {
+    normalizeChoices(doc);
+    if (typeof args.id !== 'string' || !args.id || args.id.length > 64) throw new ValidationError('파일을 찾지 못했어요.');
+    if (!!doc.finals[args.id] === !!args.final) return NO_CHANGE;
+    if (args.final) doc.finals[args.id] = nowIso(); else delete doc.finals[args.id];
+    return { id: args.id };
   }
 };
 

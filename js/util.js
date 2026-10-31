@@ -21,6 +21,8 @@ export const ICONS = {
   calendar:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 2v6m10-6v6M3 11h18m-13 4h2m4 0h2"/>',
   palette:'<path d="M12 3a9 9 0 1 0 0 18h1a2.5 2.5 0 0 0 1.6-4.4 1.3 1.3 0 0 1 .8-2.3h2.1A3.5 3.5 0 0 0 21 11c0-4.4-4-8-9-8Z"/><path d="M7 10h.1M10 6.7h.1M15 7.5h.1M6.5 14.5h.1"/>',
   chart:'<path d="M4 3v17h17M8 15V9m5 6V5m5 10v-4"/>',
+  home:'<path d="M3 11 12 4l9 7v9H3Z"/><path d="M9 20v-6h6v6"/>',
+  flag:'<path d="M5 21V4m0 0h12l-2 4 2 4H5"/>',
   radar:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><path d="m12 12 7-7"/><circle cx="12" cy="12" r="1"/>',
   briefcase:'<rect x="3" y="7" width="18" height="14" rx="2"/><path d="M8 7V3h8v4M3 12a24 24 0 0 0 18 0M12 11v4"/>',
   plane:'<path d="m22 2-7 20-4-9-9-4Z"/><path d="M11 13 22 2"/>',
