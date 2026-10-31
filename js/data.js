@@ -68,7 +68,7 @@ export class DataStore {
     const out = [];
     for (const [path] of this.docs) {
       const m = MEETING_FILE.exec(path);
-      if (m && m[2] === 'meeting') { const doc = this.meeting(m[1]); if (doc) out.push(doc); }
+      if (m && m[2] === 'meeting') { const doc = this.meeting(m[1]); if (doc && !doc.deletedAt) out.push(doc); }  // deletedAt: meeting_store 삭제 표시
     }
     return out.sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')) || String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
   }

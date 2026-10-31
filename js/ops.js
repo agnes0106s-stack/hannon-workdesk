@@ -177,12 +177,13 @@ function text(value, label, limit = MAX_TEXT_CHARS) {
   if (typeof value !== 'string' || value.length > limit || value.includes('\u0000')) throw new ValidationError(label + ' 형식 또는 길이를 확인해 주세요.');
   return value;
 }
-const MEETING_LABELS = { title: '제목', notes: '내 메모', transcript: '받아쓰기' };
+const MEETING_LABELS = { title: '제목', notes: '내 메모', transcript: '받아쓰기', deletedAt: '삭제 시각' };
 export function validateMeetingPatch(patch) {
   const out = {};
   for (const [key, value] of Object.entries(patch || {})) {
     if (!(key in MEETING_LABELS)) throw new ValidationError('수정할 수 없는 회의 필드가 포함돼 있습니다.');
-    if (key === 'title') {
+    if (key === 'deletedAt') out.deletedAt = value === null ? null : text(value, '삭제 시각', 64);
+    else if (key === 'title') {
       out.title = text(value, '제목', 200).trim();
       if (!out.title) throw new ValidationError('회의 제목을 입력해 주세요.');
     } else out[key] = text(value, MEETING_LABELS[key]);

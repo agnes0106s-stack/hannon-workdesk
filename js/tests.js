@@ -141,6 +141,15 @@ test('meetingPatch: meeting_store 검증(제목 필수·200자·250,000자·NUL�
   OPS.meetingPatch(d, { fields: { title: ' 새 제목 ', transcript: '받아쓴 글' }, base: { title: 't', transcript: '' } });
   eq(d.title, '새 제목'); eq(d.status, 'transcript_ready'); eq(d.aiSummary, null); eq(d.recordings.length, 1, '녹음 목록은 그대로');
 });
+test('meetingPatch: 회의 삭제는 deletedAt 만 남기고 녹음·내용은 그대로, null 이면 되살림', () => {
+  const m = { id: 'a'.repeat(32), title: 't', notes: '메모', transcript: '', recordings: [{ id: 'r' }], revision: 2 };
+  throws(() => OPS.meetingPatch(structuredClone(m), { fields: { deletedAt: 5 }, base: {}, force: true }), ValidationError);
+  const d = structuredClone(m);
+  OPS.meetingPatch(d, { fields: { deletedAt: '2026-11-01T00:00:00Z' }, base: {}, force: true });
+  eq(d.deletedAt, '2026-11-01T00:00:00Z'); eq(d.notes, '메모'); eq(d.recordings.length, 1);
+  OPS.meetingPatch(d, { fields: { deletedAt: null }, base: {}, force: true });
+  eq(d.deletedAt, null);
+});
 test('meetingPatch: 같은 필드를 다른 기기가 먼저 고치면 FieldConflict, force 면 저장', () => {
   const d = { id: 'a'.repeat(32), title: 't', notes: '맥에서 고침', transcript: '', revision: 3 };
   const e = throws(() => OPS.meetingPatch(structuredClone(d), { fields: { notes: '내 메모' }, base: { notes: '' } }), FieldConflict);

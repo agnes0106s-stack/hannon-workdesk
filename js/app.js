@@ -964,11 +964,25 @@ async function seek(recordingId, ms) {
 const resultText = v => typeof v === 'string' ? v : typeof v?.text === 'string' ? v.text : '';
 const segTime = s => typeof s?.startMs === 'number' && Number.isFinite(s.startMs) && s.startMs >= 0 ? s.startMs : null;
 
+// 삭제 표시(deletedAt)만 남긴다. 원음은 맥·드롭박스에 그대로 있어 되살릴 수 있다.
+async function deleteMeeting(m) {
+  // window.confirm 은 아이폰 앱(WKWebView) 안에서 뜨지 않는다.
+  if (!await confirmDialog('회의를 지울까요?', `「${m.title || '회의'}」 회의가 맥·아이폰·웹 목록에서 모두 사라져요.`, '지우기')) return;
+  state.draft = null;
+  try {
+    await store.queue.enqueue('meetingPatch', { meetingId: m.id, fields: { deletedAt: new Date().toISOString() }, base: {}, force: true });
+  } catch (err) { notify(err.message || '회의를 지우지 못했어요.'); return; }
+  state.meetingId = null;
+  notify('회의를 지웠어요.');
+  renderMeetings($('#content'));
+}
+
 function renderMeetingDetail() {
   const host = $('#meeting-detail');
   if (!host) return;
   host.replaceChildren();
-  const m = state.meetingId && store.meeting(state.meetingId);
+  const found = state.meetingId && store.meeting(state.meetingId);
+  const m = found && !found.deletedAt ? found : null;
   if (!m) {
     state.meetingId = null;
     const box = el('div', 'meeting-editor-empty');
@@ -987,6 +1001,7 @@ function renderMeetingDetail() {
   save.setAttribute('role', 'status');
   actions.append(save);
   if (!IN_APP) actions.append(withIcon('mic', '이 회의에 녹음 추가', 'secondary-button', () => openRecorder(m.id)));
+  actions.append(button('회의 삭제', 'text-button meeting-delete', () => deleteMeeting(m)));
   head.append(button('← 회의 목록', 'text-button meeting-back', async () => { await saveMeeting(); state.meetingId = null; state.draft = null; renderMeetings($('#content')); }), actions);
   const title = el('input', 'meeting-title');
   title.value = d.values.title;
