@@ -25,12 +25,12 @@ export const MAX_TEXT_CHARS = 250000;
 const nowIso = () => new Date().toISOString();
 
 export function emptyChoices() {
-  return { favorites: [], tasks: {}, notes: {}, savedTasks: {}, taskOrder: [], revision: 0 };
+  return { favorites: [], tasks: {}, notes: {}, savedTasks: {}, suggestions: {}, decisions: {}, taskOrder: [], revision: 0 };
 }
 export function normalizeChoices(doc) {
   const d = doc && typeof doc === 'object' && !Array.isArray(doc) ? doc : emptyChoices();
   if (!Array.isArray(d.favorites)) d.favorites = [];
-  for (const key of ['tasks', 'notes', 'savedTasks']) if (!d[key] || typeof d[key] !== 'object' || Array.isArray(d[key])) d[key] = {};
+  for (const key of ['tasks', 'notes', 'savedTasks', 'suggestions', 'decisions']) if (!d[key] || typeof d[key] !== 'object' || Array.isArray(d[key])) d[key] = {};
   if (!Array.isArray(d.taskOrder)) d.taskOrder = [];
   if (!Number.isInteger(d.revision)) d.revision = 0;
   return d;
@@ -126,6 +126,37 @@ export const choiceOps = {
     if (existing && existing.title === next.title && existing.body === body && (existing.category || '') === next.category && existing.project === project && !!existing.archived === next.archived) return NO_CHANGE;
     doc.notes[args.id] = { ...next, updatedAt: nowIso(), revision: (existing?.revision || 0) + 1 };
     return { note: doc.notes[args.id] };
+  },
+  /**
+   * /api/suggestion: AI 제안 승인·버리기·되돌리기. 승인한 할 일은 savedTasks 맨 위,
+   * 승인한 결정은 decisions 에 들어간다. 결과 ID 는 제안 ID 에서 나오므로 두 번 적용해도 같다.
+   */
+  suggestionAct(doc, args, ctx) {
+    normalizeChoices(doc);
+    const key = args.id, act = args.action, item = doc.suggestions[key];
+    if (!item || !['approve', 'dismiss', 'restore'].includes(act)) throw new ValidationError('제안을 찾지 못했어요.');
+    if (act !== 'approve') {
+      const state = act === 'dismiss' ? 'dismissed' : 'new';
+      if (item.state === state) return NO_CHANGE;
+      Object.assign(item, { state, decidedAt: nowIso() });
+      return { suggestion: item };
+    }
+    if (item.state === 'approved') return NO_CHANGE;
+    const text = String(args.text ?? item.text).trim();
+    if (!text || text.length > 300) throw new ValidationError('내용을 300자 이내로 적어주세요.');
+    const project = knownProject(args.project ?? item.project, ctx);
+    const source = item.source || {};
+    let result;
+    if (item.kind === 'task') {
+      result = 'task-' + key.slice(4);
+      doc.savedTasks[result] = { id: result, title: text, project, kind: 'confirmed', createdAt: nowIso(), basis: '제안 승인 · ' + (source.title || ''), evidence: (item.evidence || []).join(' / ').slice(0, 500), suggestion: key };
+      if (!doc.taskOrder.includes(result)) doc.taskOrder.unshift(result);
+    } else {
+      result = 'dec-' + key.slice(4);
+      doc.decisions[result] = { id: result, text, project, date: source.date || nowIso().slice(0, 10), source, evidence: item.evidence || [], createdAt: nowIso(), suggestion: key };
+    }
+    Object.assign(item, { state: 'approved', text, project, projectGuess: false, result, decidedAt: nowIso() });
+    return { suggestion: item };
   }
 };
 

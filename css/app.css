@@ -336,3 +336,24 @@ dialog::backdrop{background:#24344a40;backdrop-filter:blur(3px)}
 .note-categories{display:flex;flex-wrap:wrap;gap:4px;margin:-4px 0 12px}.note-categories .filter{font-size:11px;padding:5px 9px}
 .note-category-field{display:flex}.note-category{border:1px solid var(--line);border-radius:7px;padding:7px 9px;background:var(--paper,#fff);font:inherit;font-size:12px;width:200px;max-width:100%}.note-category::placeholder{color:#aab2bd}
 @media(max-width:650px){.note-category{width:150px;font-size:16px}}
+.suggestion-list{display:flex;flex-direction:column;gap:12px;max-width:760px}
+.suggestion-tabs{display:flex;gap:6px}
+.suggestion-card{border:1px solid #e5e9ee;border-radius:10px;background:#fff;padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.suggestion-card.handled{background:#fafbfc}
+.suggestion-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.suggestion-kind{font-size:11px;font-weight:600;padding:2px 8px;border-radius:5px;background:#e9f0f7;color:#455c74}
+.suggestion-kind.decision{background:#f6efe2;color:#8a6a2f}
+.suggestion-text{width:100%;font:inherit;font-size:14px;color:#2f3a46;border:1px solid #e5e9ee;border-radius:7px;padding:8px 10px;resize:vertical;background:#fff}
+.suggestion-text:disabled{background:transparent;border-color:transparent;padding-left:0;resize:none}
+.suggestion-project{display:flex;align-items:center;gap:8px;font-size:12px;color:#7a8491}
+.suggestion-project select{font:inherit;font-size:12px;padding:4px 6px;border:1px solid #e5e9ee;border-radius:6px;background:#fff}
+.ai-guess{font-size:10px;color:#9a7a3f;background:#fbf4e4;border-radius:4px;padding:1px 6px}
+.suggestion-evidence{display:flex;flex-direction:column;gap:5px}
+.suggestion-evidence blockquote{margin:0;padding:4px 10px;border-left:3px solid #dfe5ec;font-size:12px;color:#5f6b78;line-height:1.55}
+.suggestion-warning{font-size:12px;color:#a06a1f;margin:0}
+.suggestion-actions{display:flex;align-items:center;gap:8px}
+.suggestion-state{font-size:12px;color:#8a98a7}
+.brief-text{white-space:pre-wrap;font:12px/1.65 ui-monospace,SFMono-Regular,Menlo,monospace;background:#f6f8fa;border-radius:8px;padding:14px;max-height:55vh;overflow:auto;color:#3d4a59;margin:0 0 14px}
+.suggestion-tabs{display:flex;gap:6px;margin-bottom:12px}
+.brief-button{margin:4px 0 12px}
+@media(max-width:650px){.suggestion-card{padding:12px}.brief-text{max-height:50vh}}

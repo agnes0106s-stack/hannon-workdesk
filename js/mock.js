@@ -206,6 +206,11 @@ function seedFixtures(db) {
       'manual-0a1b2c3d4e5f6071': { id: 'manual-0a1b2c3d4e5f6071', title: '홍길동 님에게 일정 확인 연락하기', project: 'sample-a', kind: 'confirmed', manual: true, createdAt: iso(now - 2 * day), basis: '직접 추가한 할 일' }
     },
     taskOrder: ['a-partner', 'manual-0a1b2c3d4e5f6071', 'a-schedule', 'b-apply'],
+    suggestions: {
+      'sug-0a0a0a0a0a0a0a0a': { id: 'sug-0a0a0a0a0a0a0a0a', kind: 'task', text: '예시 협력사에 견적서 다시 보내기', project: 'sample-a', projectGuess: true, source: { type: 'meeting', id: 'mock-meeting', title: '예시 협력사 회의', date: iso(now - day).slice(0, 10) }, evidence: ['견적서는 수정해서 다음 주에 다시 보내 드릴게요.'], similar: '가상 협력사와 역할 나누기 협의', state: 'new', createdAt: iso(now - day) },
+      'sug-0b0b0b0b0b0b0b0b': { id: 'sug-0b0b0b0b0b0b0b0b', kind: 'decision', text: '첫 매장은 예시 2호점으로 정함', project: 'inbox', projectGuess: true, source: { type: 'meeting', id: 'mock-meeting', title: '예시 협력사 회의', date: iso(now - day).slice(0, 10) }, evidence: ['그럼 첫 매장은 2호점으로 가는 걸로 하죠.'], state: 'new', createdAt: iso(now - day) }
+    },
+    decisions: {},
     notes: {
       'note-1111aaaa2222bbbb': { id: 'note-1111aaaa2222bbbb', title: '통화 전에 물어볼 것', body: '- 준비 기간은 얼마나 걸리는지\n- 역할은 어떻게 나눌지\n- 다음 연락 날짜', project: 'sample-a', updatedAt: iso(now - 5 * 3600000), revision: 3, archived: false },
       'note-3333cccc4444dddd': { id: 'note-3333cccc4444dddd', title: '문구 규칙(예시)', body: '브랜드 + 핵심 단어 + 용량. 30자 안쪽.', project: 'sample-b', updatedAt: iso(now - 4 * day), revision: 1, archived: false },
@@ -217,7 +222,7 @@ function seedFixtures(db) {
     { id: 's2', project: 'sample-a', source: 'Codex', at: iso(now - day), title: '예시 비교표 정리', fileIds: ['f2', 'f3'] },
     { id: 's3', project: 'sample-b', source: 'Claude Code', at: iso(now - 3 * day), title: '예시 문구 점검', fileIds: ['f4', 'f5'] }
   ];
-  const index = { apiVersion: 2, appId: 'hannon', scannedAt: iso(now - 3 * 3600000), projects, files, activities, tasks: indexTasks, choices: { ...choices, revision: 11 }, warnings: [], sources: { Codex: 1, 'Claude Code': 2 } };
+  const index = { apiVersion: 2, appId: 'hannon', scannedAt: iso(now - 3 * 3600000), projects, files, activities, tasks: indexTasks, choices: { ...choices, revision: 11 }, briefs: { 'sample-a': '# 샘플 프로젝트 A · 이어서 하기\n(예시 요약)\n\n## 지금 상황\n- 단계: 일정 조율\n\n## 남은 할 일\n- [확정] 홍길동 님에게 일정 확인 연락하기' }, warnings: [], sources: { Codex: 1, 'Claude Code': 2 } };
   db.put('/workdesk/index.json', JSON.stringify(index, null, 2), { silent: true });
   db.put('/workdesk/choices.json', JSON.stringify(choices, null, 2), { silent: true });
   // 맥이 3시간 전에 마지막으로 보였다 → "맥이 꺼져 있어요"

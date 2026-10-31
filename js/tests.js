@@ -79,6 +79,32 @@ test('noteSave: 카테고리는 직접 적고, 프로젝트는 고르지 않음'
   eq(OPS.noteSave(c, { id: 'note-aaaaaaaaaaaaaaaa', title: '책 검수', body: '본문', category: '', baseRevision: 1 }, {}).note.category, '');
   throws(() => OPS.noteSave(c, { id: 'note-aaaaaaaaaaaaaaaa', title: 't', body: '', category: 'x'.repeat(41), baseRevision: 2 }, {}), ValidationError);
 });
+test('suggestionAct: 승인 전엔 목록에 없고, 승인하면 할 일·결정으로, 다시 해도 같음', () => {
+  const src = { type: 'meeting', id: 'm1', title: '대만 회의', date: '2026-10-31' };
+  const c = normalizeChoices({ suggestions: {
+    'sug-aaaaaaaaaaaaaaaa': { id: 'sug-aaaaaaaaaaaaaaaa', kind: 'task', text: '번역본 보내기', project: 'hongkong', projectGuess: true, source: src, evidence: ['다음 주까지 보낼게요'], state: 'new' },
+    'sug-bbbbbbbbbbbbbbbb': { id: 'sug-bbbbbbbbbbbbbbbb', kind: 'decision', text: '판매가 1,080', project: 'inbox', source: src, evidence: [], state: 'new' } } });
+  eq(allTasks([], c).length, 0, '승인 전에는 할 일 아님');
+  const ctx = { projectIds: new Set(['inbox', 'taiwan']) };
+  OPS.suggestionAct(c, { id: 'sug-aaaaaaaaaaaaaaaa', action: 'approve', text: ' 번체 번역본 보내기 ', project: 'taiwan' }, ctx);
+  eq(allTasks([], c)[0].title, '번체 번역본 보내기'); eq(allTasks([], c)[0].project, 'taiwan');
+  eq(c.suggestions['sug-aaaaaaaaaaaaaaaa'].state, 'approved');
+  eq(OPS.suggestionAct(c, { id: 'sug-aaaaaaaaaaaaaaaa', action: 'approve' }, ctx), NO_CHANGE, '두 번 승인해도 하나');
+  eq(c.taskOrder.length, 1);
+  OPS.suggestionAct(c, { id: 'sug-bbbbbbbbbbbbbbbb', action: 'approve', project: 'nope' }, ctx);
+  eq(c.decisions['dec-bbbbbbbbbbbbbbbb'].project, 'inbox', '모르는 프로젝트는 분류 대기');
+  eq(c.decisions['dec-bbbbbbbbbbbbbbbb'].date, '2026-10-31');
+  throws(() => OPS.suggestionAct(c, { id: 'sug-zzzz', action: 'approve' }, ctx), ValidationError);
+  throws(() => OPS.suggestionAct(c, { id: 'sug-aaaaaaaaaaaaaaaa', action: 'delete' }, ctx), ValidationError);
+});
+test('suggestionAct: 버리면 남아 있고 되돌릴 수 있음', () => {
+  const c = normalizeChoices({ suggestions: { 'sug-cccccccccccccccc': { id: 'sug-cccccccccccccccc', kind: 'task', text: '샘플', project: 'inbox', state: 'new' } } });
+  OPS.suggestionAct(c, { id: 'sug-cccccccccccccccc', action: 'dismiss' }, {});
+  eq(c.suggestions['sug-cccccccccccccccc'].state, 'dismissed'); eq(allTasks([], c).length, 0);
+  eq(OPS.suggestionAct(c, { id: 'sug-cccccccccccccccc', action: 'dismiss' }, {}), NO_CHANGE);
+  OPS.suggestionAct(c, { id: 'sug-cccccccccccccccc', action: 'restore' }, {});
+  eq(c.suggestions['sug-cccccccccccccccc'].state, 'new');
+});
 test('noteSave: 최신본이 바뀌고 본문도 다르면 충돌 사본, 같으면 그냥 저장', () => {
   const c = normalizeChoices({ notes: { 'note-aaaaaaaaaaaaaaaa': { id: 'note-aaaaaaaaaaaaaaaa', title: '제목', body: '다른 기기 본문', project: 'inbox', revision: 3, archived: false, updatedAt: '' } } });
   const r = OPS.noteSave(c, { id: 'note-aaaaaaaaaaaaaaaa', title: '제목', body: '내 본문', baseRevision: 2, copyId: 'note-bbbbbbbbbbbbbbbb' }, {});
