@@ -7,6 +7,9 @@ import { taskState, meetingPath, FieldConflict, ValidationError } from './ops.js
 import { Recorder, UploadStore, uploadRecording, describe, newUploadId, isIOS, pickType, sniffAudio } from './recorder.js';
 
 const MOCK = new URLSearchParams(location.search).get('mock') === '1';
+// 한눈 iPhone 앱 안에서 열리면 녹음은 앱의 녹음 탭이 맡는다.
+const IN_APP = /HannonApp\//.test(navigator.userAgent);
+if (IN_APP) document.documentElement.classList.add('in-app');
 const VIEWS = {
   home: ['오늘', '먼저 볼 것만 모았어요. 위 검색창은 할 일·메모·회의·결정·대화·결과물을 한 번에 찾아요.'],
   decisions: ['결정 기록', '승인한 결정만 모여요.'],
@@ -104,7 +107,7 @@ function updateChrome() {
   const heading = $('#heading-action');
   heading.replaceChildren();
   if (state.view === 'notes') heading.append(button('＋ 새 메모', 'primary-button', newNote));
-  if (state.view === 'meetings') heading.append(withIcon('mic', '새 녹음', 'primary-button', () => openRecorder()));
+  if (state.view === 'meetings' && !IN_APP) heading.append(withIcon('mic', '새 녹음', 'primary-button', () => openRecorder()));
   renderStatus();
 }
 
@@ -982,7 +985,8 @@ function renderMeetingDetail() {
   const save = el('span', 'meeting-save-state', d.dirty.size ? '저장 대기…' : '자동 저장됨');
   save.id = 'meeting-save-state';
   save.setAttribute('role', 'status');
-  actions.append(save, withIcon('mic', '이 회의에 녹음 추가', 'secondary-button', () => openRecorder(m.id)));
+  actions.append(save);
+  if (!IN_APP) actions.append(withIcon('mic', '이 회의에 녹음 추가', 'secondary-button', () => openRecorder(m.id)));
   head.append(button('← 회의 목록', 'text-button meeting-back', async () => { await saveMeeting(); state.meetingId = null; state.draft = null; renderMeetings($('#content')); }), actions);
   const title = el('input', 'meeting-title');
   title.value = d.values.title;

@@ -384,3 +384,4 @@ button.brief-row:hover{background:var(--desk)}
 .final-toggle{margin-left:8px;font-size:11px}
 .file-row .final-badge{margin-right:6px}
 @media(max-width:900px){.home-brief{grid-template-columns:1fr}}
+.in-app #record-open,.in-app .web-only{display:none}
