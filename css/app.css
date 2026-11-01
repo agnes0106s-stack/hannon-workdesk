@@ -339,27 +339,10 @@ dialog::backdrop{background:#24344a40;backdrop-filter:blur(3px)}
 .note-categories{display:flex;flex-wrap:wrap;gap:4px;margin:-4px 0 12px}.note-categories .filter{font-size:11px;padding:5px 9px}
 .note-category-field{display:flex}.note-category{border:1px solid var(--line);border-radius:7px;padding:7px 9px;background:var(--paper,var(--paper));font:inherit;font-size:12px;width:200px;max-width:100%}.note-category::placeholder{color:var(--faint)}
 @media(max-width:650px){.note-category{width:150px;font-size:16px}}
-.suggestion-list{display:flex;flex-direction:column;gap:12px;max-width:760px}
-.suggestion-tabs{display:flex;gap:6px}
-.suggestion-card{border:1px solid var(--line);border-radius:10px;background:var(--paper);padding:14px 16px;display:flex;flex-direction:column;gap:10px}
-.suggestion-card.handled{background:var(--desk)}
-.suggestion-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.suggestion-kind{font-size:11px;font-weight:600;padding:2px 8px;border-radius:5px;background:var(--soft);color:var(--muted)}
-.suggestion-kind.decision{background:var(--warn-bg);color:var(--warn)}
-.suggestion-text{width:100%;font:inherit;font-size:14px;color:var(--ink);border:1px solid var(--line);border-radius:7px;padding:8px 10px;resize:vertical;background:var(--paper)}
-.suggestion-text:disabled{background:transparent;border-color:transparent;padding-left:0;resize:none}
-.suggestion-project{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
-.suggestion-project select{font:inherit;font-size:12px;padding:4px 6px;border:1px solid var(--line);border-radius:6px;background:var(--paper)}
 .ai-guess{font-size:10px;color:var(--warn);background:var(--warn-bg);border-radius:4px;padding:1px 6px}
-.suggestion-evidence{display:flex;flex-direction:column;gap:5px}
-.suggestion-evidence blockquote{margin:0;padding:4px 10px;border-left:3px solid var(--line);font-size:12px;color:var(--muted);line-height:1.55}
-.suggestion-warning{font-size:12px;color:var(--warn);margin:0}
-.suggestion-actions{display:flex;align-items:center;gap:8px}
-.suggestion-state{font-size:12px;color:var(--muted)}
 .brief-text{white-space:pre-wrap;font:12px/1.65 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--desk);border-radius:8px;padding:14px;max-height:55vh;overflow:auto;color:var(--ink);margin:0 0 14px}
-.suggestion-tabs{display:flex;gap:6px;margin-bottom:12px}
 .brief-button{margin:4px 0 12px}
-@media(max-width:650px){.suggestion-card{padding:12px}.brief-text{max-height:50vh}}
+@media(max-width:650px){.brief-text{max-height:50vh}}
 .home-brief{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start}
 .brief-column{display:flex;flex-direction:column;gap:16px;min-width:0}
 .brief-card{min-width:0;border:1px solid var(--line);border-radius:10px;background:var(--paper);padding:14px 16px}
@@ -370,17 +353,10 @@ button.brief-row:hover{background:var(--desk)}
 .brief-text-line{font-size:13px;color:var(--ink);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .brief-meta{font-size:11px;color:var(--faint);flex-shrink:0}
 .brief-more{font-size:11px;color:var(--faint);margin:4px 6px 0}
-.decision-list{display:flex;flex-direction:column;gap:22px;max-width:780px}
-.decision-row{border-bottom:1px solid var(--line);padding:10px 0;display:flex;flex-direction:column;gap:6px}
-.decision-top{display:flex;gap:12px;align-items:baseline}
-.decision-top time{font-size:11px;color:var(--faint);flex-shrink:0;width:74px}
-.decision-top strong{font-size:14px;font-weight:600;color:var(--ink)}
 .final-badge{display:inline-block;font-size:10px;font-weight:600;color:var(--warn);background:var(--warn-bg);border-radius:4px;padding:1px 6px;margin-bottom:4px}
 .final-strip{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 0 12px}
 .final-link{font-size:12px;color:var(--muted);background:var(--warn-bg);border-radius:6px;padding:4px 9px;border:0}
-.suggestion-kind.move{background:var(--ok-bg);color:var(--ok)}
 .content.view-home .brief-card+.brief-card,.content.view-home>.brief-card{margin-top:12px}
-.decision-quote{margin:0;padding:3px 10px;border-left:3px solid var(--line);font-size:12px;color:var(--muted)}
 .final-toggle{margin-left:8px;font-size:11px}
 .file-row .final-badge{margin-right:6px}
 @media(max-width:900px){.home-brief{grid-template-columns:minmax(0,1fr)}}

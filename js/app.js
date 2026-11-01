@@ -11,11 +11,9 @@ const MOCK = new URLSearchParams(location.search).get('mock') === '1';
 const IN_APP = /HannonApp\//.test(navigator.userAgent);
 if (IN_APP) document.documentElement.classList.add('in-app');
 const VIEWS = {
-  home: ['오늘', '먼저 볼 것만 모았어요. 위 검색창은 할 일·메모·회의·결정·대화·결과물을 한 번에 찾아요.'],
-  decisions: ['결정 기록', '승인한 결정만 모여요.'],
+  home: ['오늘', '먼저 볼 것만 모았어요. 위 검색창은 할 일·메모·회의·대화·결과물을 한 번에 찾아요.'],
   overview: ['결과물', '프로젝트별 결과물과 남은 할 일이에요. 파일은 이름·위치·날짜만 보여줘요.'],
   tasks: ['할 일', '내가 정한 순서대로, 하나씩. 순서는 끌어서 옮기거나 ↑↓로 바꿔요.'],
-  suggestions: ['AI 제안함', '회의에서 나온 할 일과 결정이에요. 승인해야 목록에 들어가요.'],
   done: ['완료함', '완료한 일은 여기에 모여요. 다시 꺼낼 수도 있어요.'],
   notes: ['메모', '입력을 멈추면 자동으로 저장돼요.'],
   meetings: ['회의록', 'AI 회의록, 내 메모, 받아쓰기와 원음을 한곳에서.']
@@ -23,7 +21,7 @@ const VIEWS = {
 const state = {
   view: VIEWS[storageGet('hannon.view')] ? storageGet('hannon.view') : 'home',
   project: 'all', query: '', archivedNotes: false, noteCategory: 'all', note: null, meetingId: null, draft: null,
-  expanded: null, taskDraft: '', dragging: null, suggestionTab: 'new'
+  expanded: null, taskDraft: '', dragging: null
 };
 let dbx, store, uploads, recorder = null, recordingMeta = null, toastTimer;
 const links = new Map();
@@ -88,7 +86,6 @@ function updateChrome() {
   const pending = tasks.filter(t => taskState(choices, t.id) === 'pending').length;
   const done = tasks.filter(t => taskState(choices, t.id) === 'done').length;
   $('#todo-count').textContent = pending || '';
-  $('#suggestion-count').textContent = Object.values(store.choices().suggestions).filter(x => x.state === 'new').length || '';
   $('#done-count').textContent = done || '';
   const nav = $('#project-nav');
   nav.replaceChildren();
@@ -177,9 +174,7 @@ function render() {
   if (state.view === 'overview') renderOverview(c);
   else if (state.view === 'tasks' || state.view === 'done') renderTasks(c);
   else if (state.view === 'notes') renderNotes(c);
-  else if (state.view === 'suggestions') renderSuggestions(c);
   else if (state.view === 'home') renderHome(c);
-  else if (state.view === 'decisions') renderDecisions(c);
   else renderMeetings(c);
 }
 
@@ -193,7 +188,6 @@ function softRender() {
   if (state.view === 'notes') { renderNoteList(); refreshNoteEditor(); return; }
   if (state.view === 'meetings') { renderMeetingList(); refreshMeetingDetail(); return; }
   if (focused && state.view === 'tasks') { renderTaskRows(); return; }
-  if (focused && state.view === 'suggestions') return;
   render();
 }
 
@@ -295,12 +289,6 @@ function showActivity(a) {
   if (a.answer) body.append(el('h3', 'mini-heading', '마지막 답변'), el('p', 'dialog-text', a.answer.slice(0, 1600)));
   body.append(el('p', 'meeting-muted', '대화 전체는 맥에서 볼 수 있어요.'));
 }
-async function openSource(source) {
-  if (!(await flushEditors())) return;
-  if (source.type === 'meeting') { state.meetingId = source.id; navigate('meetings'); return; }
-  const a = activities().find(x => x.id === source.id);
-  if (a) showActivity(a); else notify('원본 대화를 찾지 못했어요.');
-}
 function briefCard(title, iconName, more) {
   const card = el('section', 'brief-card'), head = el('div', 'brief-head');
   head.append(icon(iconName), el('h2', '', title));
@@ -322,20 +310,12 @@ function renderHome(c) {
   const first = briefCard('먼저 할 일', 'check', button('모두 보기', 'text-button', () => navigate('tasks')));
   if (!todo.length) first.append(el('p', 'small-empty', '남은 할 일이 없어요.'));
   todo.slice(0, 5).forEach((t, i) => first.append(briefRow((i + 1) + '. ' + t.title, projectOf(t.project).name, () => navigate('tasks'))));
-  const fresh = Object.values(choices.suggestions).filter(x => x.state === 'new');
-  const sug = briefCard('AI 제안함', 'inbox', button('열기', 'text-button', () => navigate('suggestions')));
-  if (!fresh.length) sug.append(el('p', 'small-empty', '새 제안이 없어요. 맥이 회의와 AI 대화를 읽는 대로 모여요.'));
-  fresh.slice(0, 4).forEach(x => sug.append(briefRow((x.kind === 'decision' ? '[결정] ' : x.kind === 'move' ? '[옮기기] ' : '[할 일] ') + x.text, x.source?.title || '', () => navigate('suggestions'))));
   const radar = briefCard('업무 레이더', 'radar');
   let warned = 0;
   (r.staleProjects || []).forEach(x => { warned++; radar.append(briefRow('⚠ ' + x.name + (x.days == null ? ' · 대화 기록 없음' : ' · ' + x.days + '일째 손 안 댐'), '할 일 ' + x.openTasks + '개', () => { state.project = x.project; navigate('tasks'); })); });
   (r.oldTasks || []).forEach(x => { warned++; radar.append(briefRow('⏳ ' + x.title, x.days + '일 전', () => navigate('tasks'))); });
   if (r.inboxFiles || r.inboxChats) { warned++; radar.append(briefRow('📥 분류 대기 · 결과물 ' + (r.inboxFiles || 0) + '개 · 대화 ' + (r.inboxChats || 0) + '개', '맥에서 정리 모드')); }
   if (!warned) radar.append(el('p', 'small-empty', '지금은 경고할 게 없어요.'));
-  const decisions = Object.values(choices.decisions).sort((a, b) => String(b.date).localeCompare(String(a.date)));
-  const dec = briefCard('최근 결정', 'flag', button('모두 보기', 'text-button', () => navigate('decisions')));
-  if (!decisions.length) dec.append(el('p', 'small-empty', 'AI 제안함에서 결정을 승인하면 여기 쌓여요.'));
-  decisions.slice(0, 5).forEach(x => dec.append(briefRow(x.text, shortDate(x.date) + ' · ' + projectOf(x.project).name, x.source ? () => openSource(x.source) : null)));
   const finals = allFiles().filter(f => f.final);
   const fin = briefCard('최종본', 'document');
   if (!finals.length) fin.append(el('p', 'small-empty', '결과물 목록에서 "최종본"을 누르면 여기 모여요.'));
@@ -345,31 +325,14 @@ function renderHome(c) {
   if (!meetings.length) meet.append(el('p', 'small-empty', '아직 회의가 없어요.'));
   meetings.forEach(m => meet.append(briefRow(m.title || '제목 없음', m.date || '', () => { state.meetingId = m.id; navigate('meetings'); })));
   const grid = el('div', 'home-brief');
-  grid.append(first, sug, radar, dec, meet, fin);
+  grid.append(first, radar, meet, fin);
   c.append(grid);
-}
-function renderDecisions(c) {
-  c.replaceChildren();
-  const rows = Object.values(store.choices().decisions).filter(x => inProject(x) && matches(x.text, x.source?.title, ...(x.evidence || []))).sort((a, b) => String(b.date).localeCompare(String(a.date)));
-  if (!rows.length) { c.append(empty('아직 기록된 결정이 없어요.', 'AI 제안함에서 결정을 승인하면 여기에 쌓여요.', 'flag')); return; }
-  const list = el('div', 'decision-list');
-  rows.forEach(x => {
-    const row = el('article', 'decision-row'), top = el('div', 'decision-top');
-    top.append(el('time', '', x.date || ''), el('strong', '', x.text));
-    row.append(top, el('span', 'brief-meta', projectOf(x.project).name));
-    (x.evidence || []).slice(0, 2).forEach(q => row.append(el('blockquote', 'decision-quote', q)));
-    if (x.source?.id) row.append(button('근거: ' + (x.source.type === 'conversation' ? 'AI 대화' : '회의') + ' · ' + (x.source.title || ''), 'text-button', () => openSource(x.source)));
-    list.append(row);
-  });
-  c.append(list);
 }
 /** 이 기기에 내려받은 자료 전체에서 찾는다(파일 내용과 옛 대화 전문은 맥 검색에서). */
 function renderSearch(c) {
   const choices = store.choices(), q = state.query;
   const groups = [
     ['할 일', 'check', store.tasks().filter(t => matches(t.title, t.basis)).map(t => ({ title: t.title, meta: projectOf(t.project).name, go: () => navigate(taskState(choices, t.id) === 'done' ? 'done' : 'tasks') }))],
-    ['결정', 'flag', Object.values(choices.decisions).filter(x => matches(x.text, ...(x.evidence || []))).map(x => ({ title: x.text, meta: x.date, go: () => navigate('decisions') }))],
-    ['AI 제안', 'inbox', Object.values(choices.suggestions).filter(x => matches(x.text, ...(x.evidence || []))).map(x => ({ title: x.text, meta: x.state === 'new' ? '새 제안' : '처리함', go: () => navigate('suggestions') }))],
     ['메모', 'note', Object.values(choices.notes).filter(n => matches(n.title, n.body, n.category)).map(n => ({ title: n.title || '새 메모', meta: n.category || '', go: async () => { await navigate('notes'); selectNote(n); } }))],
     ['회의', 'mic', store.meetings().filter(m => matches(m.title, m.notes, m.transcript)).map(m => ({ title: m.title || '제목 없음', meta: m.date || '', go: () => { state.meetingId = m.id; navigate('meetings'); } }))],
     ['AI 대화', 'chat', activities().filter(a => matches(a.title, a.request, a.answer)).map(a => ({ title: a.title, meta: projectOf(a.project).name, go: () => showActivity(a) }))],
@@ -384,60 +347,6 @@ function renderSearch(c) {
     rows.slice(0, 20).forEach(r => card.append(briefRow(r.title, r.meta, r.go)));
     c.append(card);
   });
-}
-
-// ---------- AI 제안함 ----------
-function renderSuggestions(c) {
-  c.replaceChildren();
-  const all = Object.values(store.choices().suggestions).filter(x => x && typeof x === 'object');
-  const fresh = state.suggestionTab === 'new';
-  const rows = all.filter(x => (x.state === 'new') === fresh && inProject(x) && matches(x.text, x.source?.title, ...(x.evidence || [])))
-    .sort((a, b) => String(b.source?.date || b.createdAt || '').localeCompare(String(a.source?.date || a.createdAt || '')));
-  const tabs = el('div', 'suggestion-tabs');
-  [['new', '새 제안'], ['done', '처리한 제안']].forEach(([key, label]) => {
-    const count = all.filter(x => (x.state === 'new') === (key === 'new')).length;
-    tabs.append(button(label + ' ' + count, 'filter' + (state.suggestionTab === key ? ' active' : ''), () => { state.suggestionTab = key; renderSuggestions(c); }));
-  });
-  c.append(tabs);
-  if (!rows.length) { c.append(empty(fresh ? '새 제안이 없어요.' : '처리한 제안이 없어요.', fresh ? '맥에서 회의 요약이 끝나면 나온 할 일과 결정이 여기 모여요.' : '', 'inbox')); return; }
-  const list = el('div', 'suggestion-list');
-  rows.forEach(x => list.append(suggestionCard(x, fresh)));
-  c.append(list);
-}
-function suggestionCard(x, fresh) {
-  const card = el('article', 'suggestion-card' + (fresh ? '' : ' handled'));
-  const head = el('div', 'suggestion-head');
-  head.append(el('span', 'suggestion-kind ' + (x.kind || 'task'), x.kind === 'decision' ? '결정' : x.kind === 'move' ? '프로젝트 옮기기' : '할 일'));
-  if (x.source?.id) head.append(button((x.source.type === 'conversation' ? (x.source.via || 'AI') + ' 대화 · ' : '회의 · ') + (x.source.title || '') + (x.source.date ? ' · ' + shortDate(x.source.date) : ''), 'text-button', () => openSource(x.source)));
-  card.append(head);
-  const text = el('textarea', 'suggestion-text');
-  text.value = x.text || ''; text.rows = 2; text.maxLength = 300; text.disabled = !fresh;
-  text.setAttribute('aria-label', '제안 내용');
-  card.append(text);
-  const label = el('label', 'suggestion-project'), select = projectSelect(x.project);
-  select.disabled = !fresh;
-  label.append(el('span', '', '프로젝트'), select);
-  if (x.projectGuess && fresh) label.append(el('span', 'ai-guess', 'AI 추정'));
-  card.append(label);
-  if (x.evidence?.length) {
-    const ev = el('div', 'suggestion-evidence');
-    ev.append(el('span', 'mini-heading', '근거'));
-    x.evidence.forEach(q => ev.append(el('blockquote', '', q)));
-    card.append(ev);
-  } else if (x.kind !== 'move') card.append(el('p', 'suggestion-warning', '⚠ 근거 문장이 없어요. 원본에서 확인해보세요.'));
-  if (x.similar && fresh) card.append(el('p', 'suggestion-warning', '⚠ 비슷한 할 일이 이미 있어요: ' + x.similar));
-  const actions = el('div', 'suggestion-actions');
-  const act = action => {
-    store.queue.enqueue('suggestionAct', { id: x.id, action, text: text.value.trim(), project: select.value }).catch(e => notify(e.message));
-    notify((action === 'approve' ? (x.kind === 'decision' ? '결정 기록에 넣었어요.' : x.kind === 'move' ? '대화를 옮겼어요. 맥이 다음 정리 때 반영해요.' : '할 일에 넣었어요.') : action === 'dismiss' ? '제안을 버렸어요.' : '새 제안으로 되돌렸어요.') + offlineSuffix());
-  };
-  if (fresh) actions.append(button('승인', 'primary-button', () => act('approve')), button('버리기', 'secondary-button', () => act('dismiss')));
-  else {
-    actions.append(el('span', 'suggestion-state', x.state === 'approved' ? '승인함' : '버림'));
-    if (x.state === 'dismissed') actions.append(button('되돌리기', 'text-button', () => act('restore')));
-  }
-  card.append(actions);
-  return card;
 }
 
 // ---------- 할 일 ----------
