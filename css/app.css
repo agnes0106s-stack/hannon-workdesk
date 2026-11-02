@@ -368,3 +368,4 @@ button.brief-row:hover{background:var(--desk)}
 }
 html,body{max-width:100%;overflow-x:clip}
 .in-app #record-open,.in-app .web-only{display:none}
+.task-detail{font-size:12px;color:var(--muted);margin-top:4px;white-space:pre-line;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}

@@ -431,6 +431,7 @@ function taskRow(t, done, i, rows) {
   check.addEventListener('change', () => changeTask(t, done ? 'pending' : 'done'));
   const body = el('div', 'task-body');
   body.append(el('div', 'task-title', t.title));
+  if (t.evidence) body.append(el('div', 'task-detail', t.evidence));
   const meta = el('div', 'task-context');
   meta.append(el('span', '', projectOf(t.project).name), el('span', 'task-tag', t.manual ? '직접 추가' : t.kind === 'confirmed' ? '확정' : 'AI 제안'));
   if (done) meta.append(el('span', '', shortDate(choices.tasks[t.id]?.updatedAt) + ' 완료'));
@@ -453,7 +454,7 @@ function taskRow(t, done, i, rows) {
 function taskDetails(t, done) {
   const body = openDialog(t.title);
   body.append(el('div', 'dialog-text', t.basis || '직접 추가한 할 일'));
-  if (t.evidence) body.append(el('p', 'dialog-section', t.evidence));
+  if (t.evidence) body.append(el('p', 'dialog-section', '내용'), el('div', 'dialog-text', t.evidence));
   const row = el('div', 'dialog-buttons');
   if (!done) row.append(button('목록에서 빼기', 'secondary-button', () => { closeDialog(); changeTask(t, 'dismissed'); }));
   row.append(button('닫기', 'text-button', closeDialog));
@@ -665,10 +666,10 @@ function renderNotes(c) {
       await saveNote();
       const t = (n.title || n.body.split('\n')[0] || '').trim();
       if (!t) { notify('먼저 메모를 적어주세요.'); return; }
-      store.queue.enqueue('taskCreate', { id: 'manual-' + hex(8), title: t.slice(0, 300), project: 'inbox', createdAt: new Date().toISOString() }).catch(e => notify(e.message));
+      store.queue.enqueue('taskCreate', { id: 'manual-' + hex(8), title: t.slice(0, 300), detail: n.title ? n.body : n.body.split('\n').slice(1).join('\n'), project: 'inbox', createdAt: new Date().toISOString() }).catch(e => notify(e.message));
       notify('할 일 목록에 추가했어요.' + offlineSuffix());
     }),
-    button(n.archived ? '메모로 복원' : '메모 보관', 'text-button', async () => {
+    button(n.archived ? '메모로 복원' : '보관함으로 옮기기', 'text-button', async () => {
       if (n.isNew && !n.title && !n.body) { state.note = null; renderNotes(c); return; }
       n.archived = !n.archived;
       n.dirty = true;

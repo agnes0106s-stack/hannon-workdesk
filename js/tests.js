@@ -31,6 +31,14 @@ test('allTasks: 저장된 순서, 완료 스냅샷 우선, 직접 추가 포함'
   eq(ids.slice(0, 4), ['a-partner', 'manual-0a1b2c3d4e5f6071', 'a-schedule', 'b-apply']);
   assert(ids.includes('a-docs'), '완료한 일도 목록에 있음');
 });
+test('taskCreate: 메모에서 만든 할 일은 메모 내용을 함께 담음', () => {
+  const c = normalizeChoices({}), ctx = { projectIds: new Set(['inbox']) };
+  OPS.taskCreate(c, { id: 'manual-dddddddddddddddd', title: '운동', detail: ' 스쿼트 3세트\n버드독 ', project: 'inbox' }, ctx);
+  eq(c.savedTasks['manual-dddddddddddddddd'].evidence, '스쿼트 3세트\n버드독');
+  eq(c.savedTasks['manual-dddddddddddddddd'].basis, '메모에서 추가한 할 일');
+  OPS.taskCreate(c, { id: 'manual-eeeeeeeeeeeeeeee', title: '그냥', detail: '  ', project: 'inbox' }, ctx);
+  eq('evidence' in c.savedTasks['manual-eeeeeeeeeeeeeeee'], false);
+});
 test('taskState: 완료·버리기·복원, 잘못된 상태 거부', () => {
   const db = fresh(), c = db.read(CHOICES), ctx = ctxFor(db);
   OPS.taskState(c, { id: 'a-partner', state: 'done' }, ctx);

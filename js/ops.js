@@ -79,8 +79,11 @@ export const choiceOps = {
     const title = typeof args.title === 'string' ? args.title.trim() : '';
     if (!title || title.length > 300) throw new ValidationError('할 일을 300자 이내로 적어주세요.');
     if (!/^manual-[0-9a-f]{16}$/.test(args.id || '')) throw new ValidationError('할 일 ID가 올바르지 않아요.');
+    const detail = typeof args.detail === 'string' ? args.detail.trim() : '';
+    if (detail.length > 20000) throw new ValidationError('내용이 너무 길어요.');
     if (doc.savedTasks[args.id]) return NO_CHANGE;
-    doc.savedTasks[args.id] = { id: args.id, title, project: knownProject(args.project, ctx), kind: 'confirmed', manual: true, createdAt: args.createdAt || nowIso(), basis: '직접 추가한 할 일' };
+    doc.savedTasks[args.id] = { id: args.id, title, project: knownProject(args.project, ctx), kind: 'confirmed', manual: true, createdAt: args.createdAt || nowIso(), basis: detail ? '메모에서 추가한 할 일' : '직접 추가한 할 일' };
+    if (detail) doc.savedTasks[args.id].evidence = detail;
     doc.taskOrder = [args.id, ...doc.taskOrder.filter(k => k !== args.id)];
     return { id: args.id };
   },
