@@ -222,7 +222,14 @@ function seedFixtures(db) {
     { id: 's2', project: 'sample-a', source: 'Codex', at: iso(now - day), title: '예시 비교표 정리', fileIds: ['f2', 'f3'] },
     { id: 's3', project: 'sample-b', source: 'Claude Code', at: iso(now - 3 * day), title: '예시 문구 점검', fileIds: ['f4', 'f5'] }
   ];
-  const index = { apiVersion: 2, appId: 'hannon', scannedAt: iso(now - 3 * 3600000), projects, files, activities, tasks: indexTasks, choices: { ...choices, revision: 11 }, radar: { staleProjects: [{ project: 'sample-b', name: '샘플 프로젝트 B', days: 15, openTasks: 1 }], oldTasks: [], inboxFiles: 2, inboxChats: 1, newSuggestions: 2 }, briefs: { 'sample-a': '# 샘플 프로젝트 A · 이어서 하기\n(예시 요약)\n\n## 지금 상황\n- 단계: 일정 조율\n\n## 남은 할 일\n- [확정] 홍길동 님에게 일정 확인 연락하기' }, warnings: [], sources: { Codex: 1, 'Claude Code': 2 } };
+  // 달력 예시: A는 사흘 이어서, 하루 쉬고 다시 이틀. B는 하루씩 떨어져서.
+  const dayKey = n => { const d = new Date(now - n * day); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+  const chat = t => ({ chat: [{ title: t, count: 12 }] });
+  const calendar = { today: dayKey(0), first: dayKey(9), projects: [
+    { id: 'sample-a', name: '샘플 프로젝트 A', color: '#7A8FB0', days: { [dayKey(6)]: chat('예시 일정표 만들기'), [dayKey(5)]: chat('예시 일정표 만들기'), [dayKey(4)]: { meeting: [{ title: '예시 회의', count: 1 }] }, [dayKey(1)]: chat('예시 비교표 정리'), [dayKey(0)]: chat('예시 일정표 만들기') } },
+    { id: 'sample-b', name: '샘플 프로젝트 B', color: '#8BA28F', days: { [dayKey(9)]: chat('예시 문구 점검'), [dayKey(3)]: { file: [{ title: '문구 초안.docx', count: 1 }] } } }
+  ] };
+  const index = { apiVersion: 2, appId: 'hannon', scannedAt: iso(now - 3 * 3600000), projects, files, activities, tasks: indexTasks, choices: { ...choices, revision: 11 }, radar: { staleProjects: [{ project: 'sample-b', name: '샘플 프로젝트 B', days: 15, openTasks: 1 }], oldTasks: [], inboxFiles: 2, inboxChats: 1, newSuggestions: 2 }, briefs: { 'sample-a': '# 샘플 프로젝트 A · 이어서 하기\n(예시 요약)\n\n## 지금 상황\n- 단계: 일정 조율\n\n## 남은 할 일\n- [확정] 홍길동 님에게 일정 확인 연락하기' }, warnings: [], sources: { Codex: 1, 'Claude Code': 2 }, calendar };
   db.put('/workdesk/index.json', JSON.stringify(index, null, 2), { silent: true });
   db.put('/workdesk/choices.json', JSON.stringify(choices, null, 2), { silent: true });
   // 맥이 3시간 전에 마지막으로 보였다 → "맥이 꺼져 있어요"
@@ -247,7 +254,7 @@ function seedFixtures(db) {
       recordings: [{
         recordingId: rec1, status: 'completed', stage: 'completed', updatedAt: iso(now - day + 1800000),
         transcript: { engine: 'sample', model: 'sample', durationMs: 24000, text: segments.map(s => s.text).join('\n'), segments, detectedLanguages: ['ko', 'en', 'zh'], warnings: ['자동 받아쓰기 초안입니다. 이름·결정사항은 원음과 대조해 주세요.'] },
-        summary: { status: 'completed', needsReview: true, result: { summary: '샘플 프로젝트 A의 준비 일정을 논의했다. 역할 나누기는 양쪽 모두 검토 중이며, 필요 서류 목록은 상대방이 다시 확인하기로 했다.', decisions: ['다음 주 금요일까지 서로 안을 보낸다'], actions: [{ text: '필요 서류 목록 확인 (상대방)' }, { text: '역할 나누기 초안 작성 (나)' }], evidence: [{ quote: '다음 주 금요일까지 서로 안을 보내기로 하죠.', startMs: 19000 }], warnings: ['AI 회의록 초안입니다. 결정·담당자·마감은 원음과 대조한 뒤 확정해 주세요.'] } }
+        summary: { status: 'completed', needsReview: true, result: { processing: 'claude', minutes: '# 샘플 A × 예시 협력사 회의 결과 공유\n회의일: 2026년 1월 5일\n## 주요 안건\n1. 준비 일정\n2. 향후 준비 사항\n## 1. 준비 일정\n양쪽은 다음 주 금요일까지 서로 안을 보내기로 했습니다.\n### 향후 방향\n- 역할 나누기는 검토 중\n※ 필요 서류는 상대방이 다시 확인합니다.', summary: '샘플 프로젝트 A의 준비 일정을 논의했다. 역할 나누기는 양쪽 모두 검토 중이며, 필요 서류 목록은 상대방이 다시 확인하기로 했다.', decisions: ['다음 주 금요일까지 서로 안을 보낸다'], actions: [{ text: '필요 서류 목록 확인 (상대방)' }, { text: '역할 나누기 초안 작성 (나)' }], evidence: [{ quote: '다음 주 금요일까지 서로 안을 보내기로 하죠.', startMs: 19000 }], warnings: ['AI 회의록 초안입니다. 결정·담당자·마감은 원음과 대조한 뒤 확정해 주세요.'] } }
       }]
     },
     capabilities: { transcribe: true, summarize: true }

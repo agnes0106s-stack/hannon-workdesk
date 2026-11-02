@@ -10,16 +10,20 @@ const MOCK = new URLSearchParams(location.search).get('mock') === '1';
 // 한눈 iPhone 앱 안에서 열리면 녹음은 앱의 녹음 탭이 맡는다.
 const IN_APP = /HannonApp\//.test(navigator.userAgent);
 if (IN_APP) document.documentElement.classList.add('in-app');
+// 아이폰 앱의 '달력' 탭은 이 페이지를 ?view=calendar 로 열어 달력만 보여 준다(업무판 탭의 마지막 화면은 건드리지 않음).
+const CALENDAR_ONLY = new URLSearchParams(location.search).get('view') === 'calendar';
+if (CALENDAR_ONLY) document.documentElement.classList.add('calendar-only');
 const VIEWS = {
   home: ['오늘', '먼저 볼 것만 모았어요. 위 검색창은 할 일·메모·회의·대화·결과물을 한 번에 찾아요.'],
   overview: ['프로젝트', '프로젝트별 결과물과 남은 할 일이에요. 파일은 이름·위치·날짜만 보여줘요.'],
   tasks: ['할 일', '내가 정한 순서대로, 하나씩. 순서는 끌어서 옮기거나 ↑↓로 바꿔요.'],
   done: ['할 일', '완료한 일은 여기에 모여요. 다시 꺼낼 수도 있어요.'],
   notes: ['메모', '입력을 멈추면 자동으로 저장돼요.'],
-  meetings: ['회의록', 'AI 회의록, 내 메모, 받아쓰기와 원음을 한곳에서.']
+  meetings: ['회의록', 'AI 회의록, 내 메모, 받아쓰기와 원음을 한곳에서.'],
+  calendar: ['달력', '어느 프로젝트를 며칠 이어서 했는지. 위아래로 넘겨 보세요.']
 };
 const state = {
-  view: VIEWS[storageGet('hannon.view')] ? storageGet('hannon.view') : 'home',
+  view: CALENDAR_ONLY ? 'calendar' : VIEWS[storageGet('hannon.view')] ? storageGet('hannon.view') : 'home',
   project: 'all', query: '', archivedNotes: false, noteCategory: 'all', note: null, meetingId: null, draft: null,
   expanded: null, taskDraft: '', dragging: null
 };
@@ -160,7 +164,7 @@ function setProject(id) {
 async function navigate(view) {
   if (!(await flushEditors())) return;
   state.view = view;
-  storageSet('hannon.view', view);
+  if (!CALENDAR_ONLY) storageSet('hannon.view', view);
   if (view !== 'notes') state.note = null;
   render();
   window.scrollTo({ top: 0 });
@@ -174,6 +178,7 @@ function render() {
   else if (state.view === 'tasks' || state.view === 'done') renderTasks(c);
   else if (state.view === 'notes') renderNotes(c);
   else if (state.view === 'home') renderHome(c);
+  else if (state.view === 'calendar') renderCalendar(c);
   else renderMeetings(c);
 }
 
@@ -188,6 +193,101 @@ function softRender() {
   if (state.view === 'meetings') { renderMeetingList(); refreshMeetingDetail(); return; }
   if (focused && state.view === 'tasks') { renderTaskRows(); return; }
   render();
+}
+
+// ---------- 달력 ----------
+// 맥이 index.json 의 calendar 에 프로젝트별로 일한 날(대화 메시지·회의·결과물·완료)을 올린다.
+// 이어서 일한 날은 한 막대, 쉰 날이 끼면 나뉜다. 맥 화면과 같은 규칙.
+const CAL_KINDS = { chat: 'AI 대화', meeting: '회의', file: '결과물', done: '완료한 일' }, CAL_LANES = 4, WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
+const ymd = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+const parseDay = v => { const [y, m, d] = v.split('-').map(Number); return new Date(y, m - 1, d); };
+const dayText = d => d.slice(2).replace(/-/g, '.') + ' (' + WEEKDAYS[parseDay(d).getDay()] + ')';
+function calendarRuns(projects) {
+  const runs = [];
+  projects.forEach(p => {
+    let run = null;
+    Object.keys(p.days).sort().forEach(d => {
+      if (run && ymd(addDays(parseDay(run.end), 1)) === d) run.end = d;
+      else { run = { project: p, start: d, end: d }; runs.push(run); }
+    });
+  });
+  runs.forEach(r => { r.count = Math.round((parseDay(r.end) - parseDay(r.start)) / 864e5) + 1; });
+  return runs;
+}
+function calendarItems(p, day) {
+  const box = el('div', 'calendar-items'), kinds = p.days[day] || {};
+  Object.entries(CAL_KINDS).forEach(([k, label]) => (kinds[k] || []).forEach(it => {
+    const row = el('div', 'calendar-item');
+    row.append(el('span', 'calendar-kind', label), el('span', '', it.title + (k === 'chat' && it.count > 1 ? ' · 메시지 ' + it.count : '')));
+    box.append(row);
+  }));
+  return box;
+}
+function showCalendarRun(r) {
+  const p = r.project, body = openDialog(p.name + ' · ' + r.count + '일');
+  Object.keys(p.days).filter(d => d >= r.start && d <= r.end).sort().reverse().forEach(d => body.append(el('h3', 'calendar-day-title', dayText(d)), calendarItems(p, d)));
+}
+function showCalendarDay(day, projects) {
+  const body = openDialog(dayText(day)), rows = projects.filter(p => p.days[day]);
+  if (!rows.length) body.append(el('p', 'empty-line', '이 날은 기록이 없어요.'));
+  rows.forEach(p => { const h = el('h3', 'calendar-day-title calendar-project'); h.style.setProperty('--bar', p.color || '#7a8899'); h.textContent = p.name; body.append(h, calendarItems(p, day)); });
+}
+function renderCalendar(c) {
+  const cal = store.index()?.calendar;
+  if (!cal) { c.replaceChildren(el('p', 'empty-line', '맥에서 아직 달력을 올리지 않았어요. 맥의 한눈 앱이 켜져 있으면 몇 분 안에 생겨요.')); return; }
+  const projects = cal.projects.filter(p => state.project === 'all' || p.id === state.project), runs = calendarRuns(projects);
+  const today = parseDay(cal.today), back = ymd(addDays(today, -180));
+  const from = parseDay(((cal.first && cal.first < back) ? cal.first : back).slice(0, 7) + '-01'), until = new Date(today.getFullYear(), today.getMonth() + 4, 1);
+  const head = el('div', 'calendar-head'), title = el('h2', 'calendar-title'), nav = el('div', 'calendar-nav');
+  const grid = el('div', 'calendar-scroll'), weeks = [];
+  const goMonth = (month, smooth = true) => { const row = weeks.find(w => w.dataset.end >= month + '-01'); if (row) grid.scrollTo({ top: row.offsetTop - grid.offsetTop + (row.dataset.start < month + '-01' ? row.offsetHeight * .5 : 0), behavior: smooth ? 'smooth' : 'auto' }); };
+  const step = n => { const d = parseDay(state.calMonth + '-01'); d.setMonth(d.getMonth() + n); goMonth(ymd(d).slice(0, 7)); };
+  nav.append(button('‹', 'calendar-step', () => step(-1), '이전 달'), button('오늘', 'secondary-button calendar-today', () => goMonth(cal.today.slice(0, 7))), button('›', 'calendar-step', () => step(1), '다음 달'));
+  head.append(title, nav);
+  const weekdays = el('div', 'calendar-weekdays'); WEEKDAYS.forEach(w => weekdays.append(el('span', '', w)));
+  for (let start = addDays(from, -from.getDay()); start < until; start = addDays(start, 7)) {
+    const ws = ymd(start), we = ymd(addDays(start, 6)), row = el('div', 'calendar-week'), first = start;
+    row.dataset.start = ws; row.dataset.end = we;
+    for (let i = 0; i < 7; i++) {
+      const day = addDays(start, i), key = ymd(day), cell = el('div', 'calendar-day' + (i === 0 || i === 6 ? ' weekend' : '') + (key === cal.today ? ' today' : ''));
+      cell.style.gridColumn = i + 1; cell.dataset.month = key.slice(0, 7);
+      cell.append(button(day.getDate() === 1 ? (day.getMonth() + 1) + '월' : String(day.getDate()), 'calendar-date' + (day.getDate() === 1 ? ' month-start' : ''), () => showCalendarDay(key, projects)));
+      row.append(cell);
+    }
+    const segs = runs.filter(r => r.start <= we && r.end >= ws).map(r => ({ run: r, from: r.start < ws ? ws : r.start, to: r.end > we ? we : r.end }))
+      .sort((a, b) => (a.run.project.id === 'inbox') - (b.run.project.id === 'inbox') || a.from.localeCompare(b.from) || b.run.count - a.run.count);
+    const lanes = [], hidden = Array(7).fill(0);
+    segs.forEach(sg => {
+      const a = parseDay(sg.from).getDay(), b = parseDay(sg.to).getDay();
+      let lane = lanes.findIndex(last => last < a); if (lane < 0) { lane = lanes.length; lanes.push(-1); } lanes[lane] = b;
+      if (lane >= CAL_LANES) { for (let i = a; i <= b; i++) hidden[i]++; return; }
+      const r = sg.run, p = r.project, bar = button('', 'calendar-bar' + (sg.from === r.start ? ' starts' : '') + (sg.to === r.end ? ' ends' : '') + (r.count === 1 ? ' single' : ''), () => showCalendarRun(r));
+      bar.style.gridColumn = (a + 1) + ' / ' + (b + 2); bar.style.gridRow = lane + 2; bar.style.setProperty('--bar', p.color || '#7a8899');
+      bar.setAttribute('aria-label', p.name + ' ' + r.count + '일');
+      bar.append(el('span', 'calendar-bar-name', p.name));
+      if (r.count > 1 && b - a >= 2) bar.append(el('span', 'calendar-bar-days', r.count + '일'));
+      row.append(bar);
+    });
+    hidden.forEach((n, i) => { if (n) { const more = button('+' + n, 'calendar-more', () => showCalendarDay(ymd(addDays(first, i)), projects)); more.style.gridColumn = i + 1; more.style.gridRow = CAL_LANES + 2; row.append(more); } });
+    grid.append(row); weeks.push(row);
+  }
+  const caption = el('p', 'calendar-caption');
+  const show = month => {
+    if (grid.dataset.month === month) return;
+    grid.dataset.month = state.calMonth = month;
+    const [y, m] = month.split('-').map(Number); title.textContent = y + '년 ' + m + '월';
+    grid.querySelectorAll('.calendar-day').forEach(d => d.classList.toggle('other-month', d.dataset.month !== month));
+    const inMonth = p => Object.keys(p.days).filter(d => d.startsWith(month)), moved = projects.filter(p => inMonth(p).length), days = new Set(moved.flatMap(inMonth));
+    caption.textContent = days.size ? m + '월 일한 날 ' + days.size + '일 · ' + moved.length + '개 프로젝트' : m + '월에는 기록이 없어요';
+  };
+  // 화면 위쪽 3분의 1에 걸친 주의 수요일이 속한 달을 지금 보는 달로 본다.
+  const sync = () => { const y = grid.scrollTop + grid.clientHeight / 3, row = weeks.find(w => w.offsetTop - grid.offsetTop + w.offsetHeight > y) || weeks[weeks.length - 1]; show(ymd(addDays(parseDay(row.dataset.start), 3)).slice(0, 7)); state.calScroll = grid.scrollTop; };
+  let ticking = false;
+  grid.addEventListener('scroll', () => { if (!ticking) { ticking = true; requestAnimationFrame(() => { ticking = false; sync(); }); } }, { passive: true });
+  c.replaceChildren(head, caption, weekdays, grid);
+  if (state.calScroll != null) grid.scrollTop = state.calScroll; else goMonth(state.calMonth || cal.today.slice(0, 7), false);
+  sync();
 }
 
 // ---------- 결과물(읽기 전용) ----------
@@ -966,6 +1066,19 @@ function renderMeetingDetail() {
   if (d.conflict) showMeetingConflict();
 }
 
+/** 맥이 만든 회의록 마크다운을 안전하게(textContent) 그린다: #·##·### 제목, - 목록, 1. 번호, ※ 주석. */
+function renderMinutes(text) {
+  const box = el('div', 'meeting-minutes'); let list = null;
+  for (const raw of text.replace(/\*\*(.+?)\*\*/g, '$1').split('\n')) {
+    const line = raw.trimEnd(); let m;
+    if (!line.trim()) { list = null; continue; }
+    if ((m = line.match(/^(#{1,4})\s+(.*)$/))) { list = null; box.append(el(['h3', 'h4', 'h5', 'h6'][m[1].length - 1], '', m[2])); continue; }
+    if ((m = line.match(/^\s*[-*•]\s+(.*)$/))) { if (list?.tagName !== 'UL') { list = el('ul'); box.append(list); } list.append(el('li', '', m[1])); continue; }
+    if ((m = line.match(/^\s*\d+\.\s+(.*)$/))) { if (list?.tagName !== 'OL') { list = el('ol'); box.append(list); } list.append(el('li', '', m[1])); continue; }
+    list = null; box.append(el('p', line.startsWith('※') ? 'meeting-minutes-note' : line.startsWith('회의일') ? 'meeting-minutes-date' : '', line));
+  }
+  return box;
+}
 /** AI 회의록(먼저) + 받아쓰기·원음. processing.json 은 맥만 쓰므로 읽기 전용. */
 function renderProcessing() {
   const host = $('#meeting-processing'), tHost = $('#meeting-transcripts');
@@ -984,14 +1097,26 @@ function renderProcessing() {
   const summarized = [...rows].reverse().find(r => r?.summary?.status === 'completed' && typeof r.summary.result?.summary === 'string');
   if (summarized) {
     const r = summarized.summary.result, box = el('div', 'meeting-summary-result');
-    box.append(el('p', 'meeting-review-label', '검토 전 초안 · 결정과 할 일은 원음을 확인한 뒤 확정해주세요.'), el('p', 'meeting-generated-text', r.summary));
+    const minutes = typeof r.minutes === 'string' && r.minutes.trim() ? r.minutes : '';
+    box.append(el('p', 'meeting-review-label', 'AI 회의록 초안 · ' + (r.processing === 'claude' ? 'Claude' : '맥 안 AI') + ' · 결정과 할 일은 원음을 확인한 뒤 확정해주세요.'));
+    // Claude 가 만든 정식 회의록(마크다운)이 있으면 그것을 먼저, 결정·할 일 목록은 접어 둔다(맥 화면과 같은 구성).
+    let lists = box;
+    if (minutes) {
+      const copy = button('회의록 복사', 'secondary-button meeting-copy', async () => {
+        try { await navigator.clipboard.writeText(minutes.replace(/\*\*(.+?)\*\*/g, '$1').replace(/^#{1,4}\s+/gm, '')); notify('회의록을 복사했어요.'); }
+        catch { notify('복사하지 못했어요.'); }
+      });
+      box.append(copy, renderMinutes(minutes));
+      lists = el('details', 'meeting-summary-evidence'); lists.append(el('summary', '', '결정·할 일 목록'));
+      box.append(lists);
+    } else box.append(el('p', 'meeting-generated-text', r.summary));
     for (const [label, items] of [['결정사항 초안', r.decisions], ['후속 행동 제안', r.actions]]) {
-      const texts = Array.isArray(items) ? items.map(resultText).filter(Boolean) : [];
-      if (!texts.length) continue;
-      box.append(el('h5', '', label));
+      const rows2 = Array.isArray(items) ? items.filter(i => resultText(i)) : [];
+      if (!rows2.length) continue;
+      lists.append(el('h5', '', label));
       const ul = el('ul');
-      texts.forEach(t => ul.append(el('li', '', t)));
-      box.append(ul);
+      rows2.forEach(i => { const li = el('li', '', resultText(i)); if (i?.check) li.append(' ', el('span', 'meeting-check-mark', '원음 확인')); ul.append(li); });
+      lists.append(ul);
     }
     const evidence = Array.isArray(r.evidence) ? r.evidence : [];
     if (evidence.length) {

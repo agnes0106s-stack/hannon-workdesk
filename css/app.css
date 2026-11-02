@@ -371,3 +371,51 @@ html,body{max-width:100%;overflow-x:clip}
 .task-detail{font-size:12px;color:var(--muted);margin-top:4px;white-space:pre-line;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .language-picker{display:flex;flex-wrap:wrap;align-items:center;gap:4px}.language-picker .filter{border:1px solid var(--line)}.language-picker .filter.active{border-color:var(--accent);color:var(--ink)}.language-picker .filter[disabled]{opacity:.4}.language-picker .meeting-muted{margin:0 0 0 4px}
 .task-tabs{margin-bottom:12px}
+
+/* 달력 */
+.calendar-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.calendar-title{font-size:20px;font-weight:700}
+.calendar-nav{display:flex;gap:4px;align-items:center}
+.calendar-step{width:34px;height:34px;font-size:22px;line-height:1;border-radius:8px;color:var(--accent)}
+.calendar-today{padding:5px 12px;font-size:13px}
+.calendar-caption{font-size:12px;color:var(--muted);margin:2px 0 8px}
+.calendar-weekdays{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));font-size:11px;color:var(--muted);text-align:center;padding-bottom:4px;border-bottom:1px solid var(--line)}
+.calendar-weekdays span:first-child,.calendar-weekdays span:last-child{color:var(--faint)}
+.calendar-scroll{height:calc(100dvh - 300px);min-height:380px;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+.calendar-week{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));grid-template-rows:28px repeat(4,22px) 18px;row-gap:2px;border-bottom:1px solid var(--line);padding-bottom:4px;position:relative}
+.calendar-day{grid-row:1/-1;display:flex;justify-content:center;align-items:flex-start;padding-top:3px;transition:background .2s}
+.calendar-day.weekend{background:var(--desk)}
+.calendar-day.other-month{background:color-mix(in srgb,var(--desk) 55%,var(--paper))}
+.calendar-date{font-size:14px;font-weight:600;min-width:26px;height:24px;padding:0 5px;border-radius:999px;font-variant-numeric:tabular-nums;transition:color .2s}
+.calendar-date.month-start{color:var(--accent)}
+.calendar-day.other-month .calendar-date{color:var(--faint);font-weight:500}
+.calendar-day.today .calendar-date{background:#e5484d;color:#fff}
+.calendar-bar{z-index:1;display:flex;align-items:center;gap:4px;min-width:0;height:20px;margin:0 1px;padding:0 5px;font-size:11px;font-weight:600;text-align:left;color:var(--ink);background:color-mix(in srgb,var(--bar) 32%,var(--paper));overflow:hidden;white-space:nowrap}
+.calendar-bar.starts{margin-left:3px;border-radius:5px 0 0 5px;box-shadow:inset 3px 0 0 var(--bar)}
+.calendar-bar.ends{margin-right:3px;border-top-right-radius:5px;border-bottom-right-radius:5px}
+.calendar-bar.single{background:transparent;box-shadow:inset 2px 0 0 var(--bar);border-radius:2px;font-weight:500}
+.calendar-bar-name{overflow:hidden;text-overflow:clip}
+.calendar-bar-days{margin-left:auto;font-size:10px;font-weight:500;color:var(--muted);flex-shrink:0}
+.calendar-more{z-index:1;font-size:10px;color:var(--muted);text-align:left;padding:0 6px}
+.calendar-day-title{font-size:13px;color:var(--accent);margin:14px 0 6px}
+.calendar-project{display:flex;align-items:center;gap:8px}.calendar-project::before{content:"";width:10px;height:10px;border-radius:3px;background:var(--bar)}
+.calendar-items{display:grid;gap:5px}
+.calendar-item{display:flex;gap:8px;align-items:baseline;font-size:14px}
+.calendar-kind{font-size:11px;padding:1px 7px;border-radius:999px;background:var(--soft);color:var(--muted);white-space:nowrap}
+/* 아이폰 앱 '달력' 탭: 달력만 */
+.calendar-only .sidebar,.calendar-only .topbar,.calendar-only #page-description,.calendar-only #page-title,.calendar-only .banners{display:none!important}
+.calendar-only .app-shell{display:block}
+.calendar-only main{padding:max(12px,env(safe-area-inset-top)) 10px 0}
+.calendar-only .calendar-scroll{height:calc(100dvh - 120px - env(safe-area-inset-top))}
+/* Claude 회의록(맥과 같은 모양) */
+.meeting-copy{margin:10px 0 0;padding:6px 12px;font-size:13px}
+.meeting-minutes{margin:12px 0 4px;color:var(--ink);line-height:1.75;font-size:14px;overflow-wrap:anywhere}
+.meeting-minutes h3{margin:0 0 4px;font-size:18px}
+.meeting-minutes h4{margin:20px 0 6px;font-size:15px}
+.meeting-minutes h5{margin:14px 0 4px;font-size:14px;color:var(--ink)}
+.meeting-minutes h6{margin:10px 0 2px;font-size:13px;color:var(--muted)}
+.meeting-minutes p{margin:6px 0}
+.meeting-minutes ul,.meeting-minutes ol{margin:4px 0 8px;padding-left:22px;color:var(--ink);font-size:14px;line-height:1.75}
+.meeting-minutes-date{color:var(--muted);font-size:13px}
+.meeting-minutes-note{color:var(--warn);font-size:13px}
+.meeting-check-mark{display:inline-block;margin-left:4px;padding:1px 6px;border-radius:999px;background:var(--warn-bg);color:var(--warn);font-size:11px}

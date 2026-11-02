@@ -1,7 +1,7 @@
 'use strict';
 // 앱 껍데기(HTML·CSS·JS·아이콘)만 보관한다. 드롭박스 API 응답·원음·토큰은 절대 보관하지 않는다:
 // 다른 주소(드롭박스)로 가는 요청은 손대지 않고, 같은 주소의 정해진 파일만 다룬다.
-const VERSION = 'hannon-shell-v13';
+const VERSION = 'hannon-shell-v14';
 const SHELL = ['./', 'index.html', 'css/app.css', 'js/app.js', 'js/util.js', 'js/ops.js', 'js/engine.js', 'js/data.js', 'js/dropbox.js', 'js/mock.js', 'js/recorder.js', 'manifest.webmanifest', 'favicon.svg', 'apple-touch-icon.png', 'icon-192.png', 'icon-512.png'];
 const SHELL_URLS = new Set(SHELL.map(p => new URL(p, self.registration.scope).pathname));
 
