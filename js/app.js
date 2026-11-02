@@ -23,7 +23,8 @@ const VIEWS = {
   calendar: ['달력', '어느 프로젝트를 며칠 이어서 했는지. 위아래로 넘겨 보세요.']
 };
 const state = {
-  view: CALENDAR_ONLY ? 'calendar' : VIEWS[storageGet('hannon.view')] ? storageGet('hannon.view') : 'home',
+  // 앱 안 업무판 탭에는 달력 메뉴가 없다(아래 '달력' 탭이 맡음).
+  view: CALENDAR_ONLY ? 'calendar' : VIEWS[storageGet('hannon.view')] && !(IN_APP && storageGet('hannon.view') === 'calendar') ? storageGet('hannon.view') : 'home',
   project: 'all', query: '', archivedNotes: false, noteCategory: 'all', note: null, meetingId: null, draft: null,
   expanded: null, taskDraft: '', dragging: null
 };
