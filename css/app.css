@@ -370,3 +370,4 @@ html,body{max-width:100%;overflow-x:clip}
 .in-app #record-open,.in-app .web-only{display:none}
 .task-detail{font-size:12px;color:var(--muted);margin-top:4px;white-space:pre-line;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .language-picker{display:flex;flex-wrap:wrap;align-items:center;gap:4px}.language-picker .filter{border:1px solid var(--line)}.language-picker .filter.active{border-color:var(--accent);color:var(--ink)}.language-picker .filter[disabled]{opacity:.4}.language-picker .meeting-muted{margin:0 0 0 4px}
+.task-tabs{margin-bottom:12px}

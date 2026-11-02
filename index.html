@@ -40,11 +40,10 @@
     <button id="mobile-project-toggle" class="mobile-project-toggle" type="button" aria-expanded="false" aria-controls="project-nav">프로젝트 ⌄</button>
     <nav class="main-nav" aria-label="작업실 메뉴">
       <button class="nav-item" type="button" data-view="home"><span data-icon="home"></span>오늘</button>
-      <button class="nav-item" type="button" data-view="overview"><span data-icon="grid"></span>결과물</button>
+      <button class="nav-item" type="button" data-view="overview"><span data-icon="grid"></span>프로젝트</button>
       <button class="nav-item" type="button" data-view="tasks"><span data-icon="check"></span>할 일<span class="nav-count" id="todo-count"></span></button>
       <button class="nav-item" type="button" data-view="notes"><span data-icon="note"></span>메모</button>
       <button class="nav-item" type="button" data-view="meetings"><span data-icon="mic"></span>회의록</button>
-      <button class="nav-item" type="button" data-view="done"><span data-icon="archive"></span>완료함<span class="nav-count" id="done-count"></span></button>
     </nav>
     <div class="sidebar-label"><span>프로젝트</span></div>
     <nav id="project-nav" class="project-nav" aria-label="프로젝트 선택"></nav>
@@ -59,7 +58,7 @@
       <span id="today" class="today"></span>
       <div class="top-actions">
         <button id="record-open" class="secondary-button meeting-start" type="button"><span data-icon="mic"></span>새 녹음</button>
-        <label class="search"><span data-icon="search"></span><input id="search" type="search" placeholder="작업실에서 찾기" aria-label="작업실에서 찾기" autocomplete="off"></label>
+        <label class="search"><span data-icon="search"></span><input id="search" type="search" placeholder="찾기" aria-label="작업실에서 찾기" autocomplete="off"></label>
         <button id="sync-now" class="icon-button" type="button" aria-label="지금 동기화" title="지금 동기화"><span data-icon="refresh"></span></button>
       </div>
     </header>

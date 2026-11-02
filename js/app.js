@@ -12,9 +12,9 @@ const IN_APP = /HannonApp\//.test(navigator.userAgent);
 if (IN_APP) document.documentElement.classList.add('in-app');
 const VIEWS = {
   home: ['오늘', '먼저 볼 것만 모았어요. 위 검색창은 할 일·메모·회의·대화·결과물을 한 번에 찾아요.'],
-  overview: ['결과물', '프로젝트별 결과물과 남은 할 일이에요. 파일은 이름·위치·날짜만 보여줘요.'],
+  overview: ['프로젝트', '프로젝트별 결과물과 남은 할 일이에요. 파일은 이름·위치·날짜만 보여줘요.'],
   tasks: ['할 일', '내가 정한 순서대로, 하나씩. 순서는 끌어서 옮기거나 ↑↓로 바꿔요.'],
-  done: ['완료함', '완료한 일은 여기에 모여요. 다시 꺼낼 수도 있어요.'],
+  done: ['할 일', '완료한 일은 여기에 모여요. 다시 꺼낼 수도 있어요.'],
   notes: ['메모', '입력을 멈추면 자동으로 저장돼요.'],
   meetings: ['회의록', 'AI 회의록, 내 메모, 받아쓰기와 원음을 한곳에서.']
 };
@@ -78,7 +78,7 @@ function projectSelect(value, id) {
 // ---------- 테두리(메뉴·상태) ----------
 function updateChrome() {
   document.querySelectorAll('[data-view]').forEach(b => {
-    const active = b.dataset.view === state.view;
+    const active = b.dataset.view === (state.view === 'done' ? 'tasks' : state.view);
     b.classList.toggle('active', active);
     if (active) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
   });
@@ -86,7 +86,6 @@ function updateChrome() {
   const pending = tasks.filter(t => taskState(choices, t.id) === 'pending').length;
   const done = tasks.filter(t => taskState(choices, t.id) === 'done').length;
   $('#todo-count').textContent = pending || '';
-  $('#done-count').textContent = done || '';
   const nav = $('#project-nav');
   nav.replaceChildren();
   const all = button('모든 프로젝트', 'project-button' + (state.project === 'all' ? ' active' : ''), () => setProject('all'));
@@ -383,6 +382,11 @@ function moveBy(t, step) {
 function renderTasks(c) {
   c.replaceChildren();
   const done = state.view === 'done';
+  const choices = store.choices(), all = store.tasks().filter(t => state.project === 'all' || t.project === state.project);
+  const tabs = el('div', 'type-filters task-tabs');
+  tabs.append(button('남은 일 ' + all.filter(t => taskState(choices, t.id) === 'pending').length, 'filter' + (done ? '' : ' active'), () => navigate('tasks')),
+    button('완료 ' + all.filter(t => taskState(choices, t.id) === 'done').length, 'filter' + (done ? ' active' : ''), () => navigate('done')));
+  c.append(tabs);
   if (!done) {
     const form = el('form', 'task-compose'), input = el('input');
     input.placeholder = '새로 할 일 적기';
