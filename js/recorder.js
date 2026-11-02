@@ -167,12 +167,13 @@ export async function sniffAudio(file) {
 }
 
 /** 설명 JSON(규격의 inbox 형식). */
-export function describe({ uploadId, contentType, ext, size, meetingId, title, date, region, language }) {
+export function describe({ uploadId, contentType, ext, size, meetingId, title, date, region, language, languages, participants }) {
   return {
     uploadId, createdAt: new Date().toISOString().replace(/\.\d+Z$/, 'Z'), contentType,
     audioPath: '/inbox/' + uploadId + '.' + ext, size,
     meetingId: meetingId || null, title: meetingId ? '' : (title || '').trim().slice(0, 200), date: date || localDay(),
-    region, language, source: 'web'
+    region, language, languages: Array.isArray(languages) ? languages.slice(0, 3) : [],
+    participants: Number.isInteger(participants) && participants >= 1 && participants <= 20 ? participants : null, source: 'web'
   };
 }
 

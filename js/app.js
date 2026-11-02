@@ -1,5 +1,5 @@
 // 한눈 웹 업무판 — 화면. 모든 글자는 textContent 로만 넣는다(데이터로 innerHTML 금지).
-import { $, el, button, icon, iconButton, withIcon, hex, shortDate, fullDate, relative, localDay, duration, sizeLabel, REGIONS, LANGUAGES, speakerLabel, storageGet, storageSet } from './util.js';
+import { $, el, button, icon, iconButton, withIcon, hex, shortDate, fullDate, relative, localDay, duration, sizeLabel, REGIONS, LANGUAGES, SPOKEN, legacyLanguage, spokenLabel, speakerLabel, storageGet, storageSet } from './util.js';
 import { RealDropbox, startLogin, finishLoginIfReturning, hasToken } from './dropbox.js';
 import { MockDropbox } from './mock.js';
 import { DataStore } from './data.js';
@@ -918,7 +918,7 @@ function renderMeetingDetail() {
   title.maxLength = 200;
   title.setAttribute('aria-label', '회의 제목');
   title.addEventListener('input', () => meetingInput('title', title.value));
-  const meta = el('p', 'meeting-meta-line', [m.date, REGIONS[m.region] || '지역 미정', LANGUAGES[m.language] || '', (m.recordings?.length || 0) + '개 녹음', '수정 ' + relative(m.updatedAt)].filter(Boolean).join(' · '));
+  const meta = el('p', 'meeting-meta-line', [m.date, REGIONS[m.region] || '지역 미정', spokenLabel(m.languages) || LANGUAGES[m.language] || '', m.participants ? m.participants + '명' : '', (m.recordings?.length || 0) + '개 녹음', '수정 ' + relative(m.updatedAt)].filter(Boolean).join(' · '));
   const conflict = el('div', 'meeting-conflict');
   conflict.id = 'meeting-conflict';
   conflict.hidden = true;
@@ -1062,18 +1062,39 @@ function openRecorder(meetingId = null) {
   const region = el('select');
   Object.entries(REGIONS).forEach(([k, v]) => { const o = el('option', '', v); o.value = k; region.append(o); });
   region.value = storageGet('hannon.region', 'taiwan');
-  const language = el('select');
-  Object.entries(LANGUAGES).forEach(([k, v]) => { const o = el('option', '', v); o.value = k; language.append(o); });
-  language.value = storageGet('hannon.language', 'auto');
+  // 쓰는 언어는 최대 3개까지 고른다. 안 고르면 자동 인식.
+  let chosen = (() => { try { const v = JSON.parse(storageGet('hannon.languages', '[]')); return Array.isArray(v) ? v.filter(c => SPOKEN[c]).slice(0, 3) : []; } catch { return []; } })();
+  const language = el('div', 'language-picker');
+  language.setAttribute('role', 'group'); language.setAttribute('aria-label', '쓰는 언어, 최대 3개');
+  const languageHint = el('span', 'meeting-muted');
+  const drawLanguages = () => {
+    language.querySelectorAll('button').forEach(b => { const on = chosen.includes(b.dataset.code); b.classList.toggle('active', on); b.setAttribute('aria-pressed', String(on)); b.disabled = !on && chosen.length >= 3; });
+    languageHint.textContent = chosen.length ? (chosen.length >= 3 ? '최대 3개' : '') : '안 고르면 자동 인식';
+  };
+  Object.entries(SPOKEN).forEach(([code, label]) => {
+    const b = button(label, 'filter', () => { chosen = chosen.includes(code) ? chosen.filter(c => c !== code) : [...chosen, code].slice(0, 3); drawLanguages(); });
+    b.dataset.code = code; language.append(b);
+  });
+  language.append(languageHint);
+  const people = el('input'); people.type = 'number'; people.min = '1'; people.max = '20'; people.inputMode = 'numeric'; people.placeholder = '모름';
+  people.value = storageGet('hannon.participants', '');
+  const peopleCount = () => { const v = Number.parseInt(people.value, 10); return v >= 1 && v <= 20 ? v : null; };
+  people.addEventListener('change', () => { people.value = peopleCount() || ''; });
   const titleField = field('제목', title), dateField = field('날짜', date);
   const sync = () => {
     const existing = store.meeting(meetingSel.value);
     titleField.hidden = !!existing; dateField.hidden = !!existing;
-    if (existing) { region.value = existing.region || region.value; language.value = existing.language || language.value; }
+    if (existing) {
+      region.value = existing.region || region.value;
+      if (Array.isArray(existing.languages)) { chosen = existing.languages.filter(c => SPOKEN[c]).slice(0, 3); drawLanguages(); }
+      if (existing.participants) people.value = existing.participants;
+    }
   };
   meetingSel.addEventListener('change', sync);
   const grid = el('div', 'meeting-notice-fields');
-  grid.append(field('어느 회의에', meetingSel), titleField, dateField, field('지역', region), field('언어', language));
+  const group = (label, control) => { const d = el('div', 'meeting-field'); d.append(el('span', '', label), control); return d; };
+  grid.append(field('어느 회의에', meetingSel), titleField, dateField, field('지역', region), group('쓰는 언어 (최대 3개)', language), field('참석자 수 (나 포함)', people));
+  drawLanguages();
   form.append(grid);
   if (!canRecord) form.append(el('p', 'dialog-text', '이 브라우저에서는 바로 녹음할 수 없어요. 녹음 파일 올리기는 할 수 있어요.'));
   const warn = el('div', 'record-warning');
@@ -1086,7 +1107,8 @@ function openRecorder(meetingId = null) {
   start.type = 'submit'; start.hidden = !canRecord;
   const picker = el('input'); picker.type = 'file'; picker.multiple = true; picker.hidden = true;
   picker.accept = 'audio/*,.m4a,.mp4,.mp3,.wav,.ogg,.opus,.webm';
-  const chosenMeta = () => ({ meetingId: meetingSel.value || null, title: title.value, date: date.value || localDay(), region: region.value, language: language.value });
+  const chosenMeta = () => ({ meetingId: meetingSel.value || null, title: title.value, date: date.value || localDay(), region: region.value,
+    language: legacyLanguage(chosen), languages: [...chosen], participants: peopleCount() });
   picker.addEventListener('change', () => { const files = [...picker.files]; picker.value = ''; if (files.length) { closeDialog(); uploadFiles(files, chosenMeta()); } });
   row.append(start, button('녹음 파일 올리기', canRecord ? 'secondary-button' : 'primary-button', () => picker.click()), button('닫기', 'text-button', closeDialog), picker);
   form.append(el('p', 'meeting-muted', '음성 메모·파일 앱의 녹음(M4A, MP3, WAV, OGG, WebM)도 올릴 수 있어요. 여러 개를 고르면 따로따로 회의에 붙어요.'));
@@ -1095,8 +1117,9 @@ function openRecorder(meetingId = null) {
     e.preventDefault();
     start.disabled = true;
     storageSet('hannon.region', region.value);
-    storageSet('hannon.language', language.value);
-    recordingMeta = { meetingId: meetingSel.value || null, title: title.value, date: date.value || localDay(), region: region.value, language: language.value };
+    storageSet('hannon.languages', JSON.stringify(chosen));
+    storageSet('hannon.participants', people.value);
+    recordingMeta = chosenMeta();
     try { await beginRecording(); closeDialog(); }
     catch (err) { start.disabled = false; recordingMeta = null; notify(err.message); }
   });

@@ -116,6 +116,11 @@ export function sizeLabel(bytes) {
 export const clone = v => v === undefined ? undefined : JSON.parse(JSON.stringify(v));
 export const REGIONS = { taiwan: '대만', korea: '한국', hongkong: '홍콩' };
 export const LANGUAGES = { auto: '언어 자동 인식', ko: '한국어', 'zh-TW': '대만 중국어', yue: '광둥어', mixed: '여러 언어' };
+/** 회의에서 실제로 쓰는 언어(최대 3개). 받아쓰기는 이 언어로만 적는다. */
+export const SPOKEN = { ko: '한국어', en: '영어', ja: '일본어', zh: '중국어', yue: '광둥어' };
+/** 예전 단일 언어 칸(language)과 맞춰 둔다. */
+export const legacyLanguage = codes => codes.length === 1 ? ({ ko: 'ko', zh: 'zh-TW', yue: 'yue' }[codes[0]] || 'mixed') : codes.length ? 'mixed' : 'auto';
+export const spokenLabel = codes => Array.isArray(codes) && codes.length ? codes.map(c => SPOKEN[c] || c).join('·') : '';
 export function speakerLabel(value) {
   if (typeof value !== 'string') return '';
   if (value === 'me') return '나';

@@ -301,7 +301,11 @@ test('inbox 업로드: uploadId 형식, 원음 먼저 그다음 설명 JSON, 재
   const id = newUploadId(new Date(2026, 9, 31, 15, 30, 12));
   assert(/^20261031-153012-[0-9a-f]{8}$/.test(id), id);
   const meta = describe({ uploadId: id, contentType: 'audio/mp4', ext: 'm4a', size: 20, meetingId: null, title: '시험', date: '2026-10-31', region: 'taiwan', language: 'auto' });
-  eq(Object.keys(meta).sort(), ['audioPath', 'contentType', 'createdAt', 'date', 'language', 'meetingId', 'region', 'size', 'source', 'title', 'uploadId'].sort());
+  eq(Object.keys(meta).sort(), ['audioPath', 'contentType', 'createdAt', 'date', 'language', 'languages', 'meetingId', 'participants', 'region', 'size', 'source', 'title', 'uploadId'].sort());
+  eq(meta.languages, []); eq(meta.participants, null);
+  const spoken = describe({ uploadId: id, contentType: 'audio/mp4', ext: 'm4a', size: 20, meetingId: null, title: '시험', date: '2026-10-31', region: 'taiwan', language: 'mixed', languages: ['en', 'ja'], participants: 3 });
+  eq(spoken.languages, ['en', 'ja']); eq(spoken.participants, 3);
+  eq(describe({ uploadId: id, contentType: 'audio/mp4', ext: 'm4a', size: 20, region: 'taiwan', participants: 33 }).participants, null, '범위 밖 참석자 수는 비움');
   eq(meta.audioPath, '/inbox/' + id + '.m4a'); eq(meta.source, 'web');
   const db = new MockDropbox({ seed: false, latency: 1 });
   const store = new UploadStore(null);
