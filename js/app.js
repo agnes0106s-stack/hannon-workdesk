@@ -192,6 +192,18 @@ function softRender() {
 }
 
 // ---------- 결과물(읽기 전용) ----------
+// One file per series: "계산기_v8", "계산기_v9", "계산기 (2)", "계산기_최종" share a key; only the newest stays (same rule as the Mac screen).
+function seriesKey(f) {
+  const n = String(f.name || f.title || '').replace(/\.[^.]+$/, '').normalize('NFC').toLowerCase().replace(/\s*\(\d+\)$/, '')
+    .replace(/[\s_-]*v\d+(\.\d+)*(?=$|[\s_.-])/g, '').replace(/[\s_-]*(19|20)\d{2}[-.]?\d{2}[-.]?\d{2}/g, '')
+    .replace(/_[^_]*(본|수정|반영|첨삭지|修訂版|完成版|審閱版)$/, '').replace(/[\s_-]*(최종본?|final|수정본?|복사본|copy|revised|reviewed)$/g, '').replace(/[\s_-]+$/, '');
+  return f.project + '|' + String(f.extension || '').toLowerCase() + '|' + n;
+}
+function latestOnly(rows) {
+  const best = new Map();
+  rows.forEach(f => { const k = seriesKey(f), b = best.get(k); if (!b || (f.modified || 0) > (b.modified || 0)) best.set(k, f); });
+  return rows.filter(f => best.get(seriesKey(f)) === f);
+}
 function renderOverview(c) {
   c.replaceChildren();
   const index = store.index();
@@ -206,7 +218,8 @@ function renderOverview(c) {
   if (!rows.length) { c.append(empty('조건에 맞는 프로젝트가 없어요.', '다른 검색어를 입력해보세요.', 'grid')); return; }
   const list = el('div', 'project-overview');
   for (const p of rows) {
-    const pfiles = files.filter(f => f.project === p.id && (!state.query || matches(p.name, f.title, f.name) )).sort((a, b) => (b.modified || 0) - (a.modified || 0));
+    const allPfiles = files.filter(f => f.project === p.id && (!state.query || matches(p.name, f.title, f.name) )).sort((a, b) => (b.modified || 0) - (a.modified || 0));
+    const pfiles = latestOnly(allPfiles), olderVersions = allPfiles.length - pfiles.length;
     const pending = tasks.filter(t => t.project === p.id && taskState(choices, t.id) === 'pending');
     const section = el('section', 'overview-project');
     const open = state.expanded === p.id;
@@ -248,6 +261,7 @@ function renderOverview(c) {
         fl.append(row);
       });
       if (pfiles.length > 30) fl.append(el('p', 'small-empty', '외 ' + (pfiles.length - 30) + '개는 맥에서 확인해주세요.'));
+      if (olderVersions) fl.append(el('p', 'small-empty', '같은 파일의 이전 버전 ' + olderVersions + '개는 숨겼어요.'));
       fl.append(el('p', 'meeting-muted', '파일 열기는 맥에서만 할 수 있어요.'));
       panel.append(fl);
       section.append(panel);
