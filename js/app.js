@@ -243,8 +243,10 @@ function renderCalendar(c) {
   const head = el('div', 'calendar-head'), title = el('h2', 'calendar-title'), nav = el('div', 'calendar-nav');
   const grid = el('div', 'calendar-scroll'), weeks = [];
   const goMonth = (month, smooth = true) => { const row = weeks.find(w => w.dataset.end >= month + '-01'); if (row) grid.scrollTo({ top: row.offsetTop - grid.offsetTop + (row.dataset.start < month + '-01' ? row.offsetHeight * .5 : 0), behavior: smooth ? 'smooth' : 'auto' }); };
+  // 오늘이 화면 가운데쯤(조금 아래) 오도록: 위로는 지난 기록, 아래로는 앞으로의 날이 함께 보인다.
+  const goToday = (smooth = true) => { const row = weeks.find(w => w.dataset.end >= cal.today); if (row) grid.scrollTo({ top: Math.max(0, row.offsetTop - grid.offsetTop - (grid.clientHeight - row.offsetHeight) * 0.55), behavior: smooth ? 'smooth' : 'auto' }); };
   const step = n => { const d = parseDay(state.calMonth + '-01'); d.setMonth(d.getMonth() + n); goMonth(ymd(d).slice(0, 7)); };
-  nav.append(button('‹', 'calendar-step', () => step(-1), '이전 달'), button('오늘', 'secondary-button calendar-today', () => goMonth(cal.today.slice(0, 7))), button('›', 'calendar-step', () => step(1), '다음 달'));
+  nav.append(button('‹', 'calendar-step', () => step(-1), '이전 달'), button('오늘', 'secondary-button calendar-today', () => goToday()), button('›', 'calendar-step', () => step(1), '다음 달'));
   head.append(title, nav);
   const weekdays = el('div', 'calendar-weekdays'); WEEKDAYS.forEach(w => weekdays.append(el('span', '', w)));
   for (let start = addDays(from, -from.getDay()); start < until; start = addDays(start, 7)) {
@@ -287,7 +289,7 @@ function renderCalendar(c) {
   let ticking = false;
   grid.addEventListener('scroll', () => { if (!ticking) { ticking = true; requestAnimationFrame(() => { ticking = false; sync(); }); } }, { passive: true });
   c.replaceChildren(head, caption, weekdays, grid);
-  if (state.calScroll != null) grid.scrollTop = state.calScroll; else goMonth(state.calMonth || cal.today.slice(0, 7), false);
+  if (state.calScroll != null) grid.scrollTop = state.calScroll; else goToday(false);
   sync();
 }
 
