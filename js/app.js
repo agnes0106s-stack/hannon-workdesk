@@ -536,6 +536,13 @@ function showFollowup(m) {
   if (rows.length) acts.append(button('고른 것 할 일로 넣기', 'primary-button', () => save(rows.filter(r => r.check.checked && r.input.value.trim()).map(r => ({ title: r.input.value.trim(), due: r.due.value })))));
   body.append(acts);
 }
+function reminderStatusBar() {
+  const bar = el('div', 'reminder-status'), text = el('span', '', R.statusText());
+  text.id = 'reminder-status-text';
+  bar.append(text, button('시험 알림 보내기', 'text-button', () => { R.test(); notify('5초 뒤에 시험 알림이 와요. 앱을 내려 두면 잘 보여요.'); }));
+  return bar;
+}
+R.onStatus(() => { const t = $('#reminder-status-text'); if (t) t.textContent = R.statusText(); });
 /** 앞으로 7일 치 알림을 앱에 넘긴다(같은 목록이면 안 보냄). 달력 탭은 업무판 탭이 맡는다. */
 function scheduleReminders() {
   if (!store || CALENDAR_ONLY || !store.get(INDEX_PATH)) return;
@@ -631,6 +638,7 @@ function renderTasks(c) {
     });
     c.append(form);
   }
+  if (R.inApp() && !done) c.append(reminderStatusBar());
   const caption = el('div', 'gallery-caption');
   caption.id = 'task-caption';
   c.append(caption);

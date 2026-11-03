@@ -83,5 +83,26 @@
     return true;
   }
 
-  g.HannonReminders = { plan, label, snooze, send, ymd, addDays };
+  /** 앱에 바로 시험 알림을 부탁한다(5초 뒤). 앱 밖이면 false. */
+  function test() {
+    const bridge = g.webkit?.messageHandlers?.hannonReminders;
+    if (!bridge) return false;
+    bridge.postMessage({ action: 'test' });
+    return true;
+  }
+  /** 앱이 예약 결과를 알려 준다: {permission:'authorized'|'denied'|..., scheduled:n, next:ms|null}. */
+  const listeners = new Set();
+  const api = { plan, label, snooze, send, test, ymd, addDays, status: null, inApp: () => !!g.webkit?.messageHandlers?.hannonReminders, onStatus: fn => listeners.add(fn) };
+  g.hannonReminderStatus = s => { api.status = s; listeners.forEach(fn => { try { fn(s); } catch { /* 화면 쪽 오류는 무시 */ } }); };
+  /** 상태 한 줄. 예: "알림 12개 예약됨 · 다음 11/3 18:00" */
+  api.statusText = () => {
+    const s = api.status;
+    if (!s) return '앱에 알림 예약을 넘기는 중…';
+    if (s.permission === 'denied') return '알림이 꺼져 있어요. 설정 › 알림 › 한눈에서 켜 주세요.';
+    if (s.permission !== 'authorized' && s.permission !== 'provisional') return '알림 허용을 기다려요. 처음 묻는 창에서 허용을 눌러 주세요.';
+    if (!s.scheduled) return '알림이 허용돼 있어요. 지금 예약된 알림은 없어요.';
+    const d = new Date(s.next);
+    return '알림 ' + s.scheduled + '개 예약됨 · 다음 ' + (d.getMonth() + 1) + '/' + d.getDate() + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+  };
+  g.HannonReminders = api;
 })(globalThis);
