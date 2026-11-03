@@ -285,12 +285,21 @@ function renderCalendar(c) {
     caption.textContent = days.size ? m + '월 일한 날 ' + days.size + '일 · ' + moved.length + '개 프로젝트' : m + '월에는 기록이 없어요';
   };
   // 화면 위쪽 3분의 1에 걸친 주의 수요일이 속한 달을 지금 보는 달로 본다.
-  const sync = () => { const y = grid.scrollTop + grid.clientHeight / 3, row = weeks.find(w => w.offsetTop - grid.offsetTop + w.offsetHeight > y) || weeks[weeks.length - 1]; show(ymd(addDays(parseDay(row.dataset.start), 3)).slice(0, 7)); state.calScroll = grid.scrollTop; };
+  let placed = false;
+  const sync = () => { const y = grid.scrollTop + grid.clientHeight / 3, row = weeks.find(w => w.offsetTop - grid.offsetTop + w.offsetHeight > y) || weeks[weeks.length - 1]; show(ymd(addDays(parseDay(row.dataset.start), 3)).slice(0, 7)); if (placed) state.calScroll = grid.scrollTop; };
   let ticking = false;
   grid.addEventListener('scroll', () => { if (!ticking) { ticking = true; requestAnimationFrame(() => { ticking = false; sync(); }); } }, { passive: true });
   c.replaceChildren(head, caption, weekdays, grid);
-  // 앱이 막 켜질 때는 화면 높이가 아직 0일 수 있어, 자리를 잡은 다음 프레임에 한 번 더 맞춘다.
-  if (state.calScroll != null) grid.scrollTop = state.calScroll; else { goToday(false); requestAnimationFrame(() => { if (grid.isConnected) { goToday(false); sync(); } }); }
+  // 앱이 막 켜질 때는 달력이 아직 화면에 없어 높이가 0일 수 있다. 실제 크기가 생긴 뒤에야 오늘 위치로 옮기고,
+  // 그 전의 0 은 '보던 위치'로 기억하지 않는다.
+  const place = () => {
+    if (placed || !grid.isConnected || grid.clientHeight < 50) return;
+    placed = true;
+    if (state.calScroll != null) grid.scrollTop = state.calScroll; else goToday(false);
+    sync();
+  };
+  if (window.ResizeObserver) new ResizeObserver(place).observe(grid);
+  place(); requestAnimationFrame(place);
   sync();
 }
 
