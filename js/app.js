@@ -1201,6 +1201,17 @@ function renderMinutes(text) {
   for (const raw of text.replace(/\*\*(.+?)\*\*/g, '$1').split('\n')) {
     const line = raw.trimEnd(); let m;
     if (!line.trim()) { list = null; continue; }
+    // 결과 중심 형식(📋·【】·■·✅·🔸·▪️·→·①) — 맥 web/meetings.js 와 같은 규칙.
+    if(/^━{4,}/.test(line)){list=null;box.append(el('hr','meeting-minutes-rule'));continue;}
+    if((m=line.match(/^【(.+)】$/))){list=null;box.append(el('h4','meeting-minutes-section',m[1]));continue;}
+    if(/^📋/.test(line)){list=null;box.append(el('h3','',line.replace(/^📋\s*/,'')));continue;}
+    if(/^📅/.test(line)){list=null;box.append(el('p','meeting-minutes-date',line.replace(/^📅\s*/,'')));continue;}
+    if((m=line.match(/^■\s*(.*)$/))){list=null;box.append(el('h5','',m[1]));continue;}
+    if(/^(✅|🔸|📌)/.test(line)){list=null;box.append(el('p','meeting-minutes-flag '+(line.startsWith('✅')?'ok':line.startsWith('🔸')?'open':'pin'),line));continue;}
+    if((m=line.match(/^▪️?\s*(.*)$/))){list=null;box.append(el('p','meeting-minutes-owner',m[1]));continue;}
+    if((m=line.match(/^→\s*(.*)$/))){list=null;box.append(el('p','meeting-minutes-task','→ '+m[1]));continue;}
+    if(/^➡️/.test(line)){list=null;box.append(el('p','meeting-minutes-conclusion',line));continue;}
+    if(/^[①-⑳]/.test(line.trim())){if(list?.className!=='meeting-minutes-steps'){list=el('ul','meeting-minutes-steps');box.append(list);}list.append(el('li','',line.trim()));continue;}
     if ((m = line.match(/^(#{1,4})\s+(.*)$/))) { list = null; box.append(el(['h3', 'h4', 'h5', 'h6'][m[1].length - 1], '', m[2])); continue; }
     if ((m = line.match(/^\s*[-*•]\s+(.*)$/))) { if (list?.tagName !== 'UL') { list = el('ul'); box.append(list); } list.append(el('li', '', m[1])); continue; }
     if ((m = line.match(/^\s*\d+\.\s+(.*)$/))) { if (list?.tagName !== 'OL') { list = el('ol'); box.append(list); } list.append(el('li', '', m[1])); continue; }

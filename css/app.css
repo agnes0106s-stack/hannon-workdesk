@@ -430,3 +430,10 @@ html,body{max-width:100%;overflow-x:clip}
 .followup-title{width:100%;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:13px;line-height:1.5;resize:vertical;background:var(--paper);color:var(--ink)}.followup-due{grid-column:2;justify-self:start;border:1px solid var(--line);border-radius:8px;padding:6px 8px;font-size:13px;color:var(--muted);background:var(--paper)}.followup-row .meeting-check-mark{grid-column:2;justify-self:start}
 .followup-card{border-color:var(--warn)!important;background:var(--warn-bg)}
 .reminder-status{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:4px 0 12px;padding:9px 12px;border-radius:9px;background:var(--soft);font-size:12px;color:var(--muted)}
+/* 결과 중심 회의록 */
+.meeting-minutes-rule{border:0;border-top:1px solid var(--line);margin:18px 0}
+.meeting-minutes .meeting-minutes-section{font-size:16px;margin:4px 0 8px;color:var(--accent)}
+.meeting-minutes-flag{font-weight:600;margin:12px 0 2px!important}.meeting-minutes-flag.ok{color:var(--ok)}.meeting-minutes-flag.open{color:var(--warn)}.meeting-minutes-flag.pin{color:var(--accent)}
+.meeting-minutes-owner{font-weight:600;margin:10px 0 0!important}.meeting-minutes-task{margin:0 0 4px 14px!important;color:var(--muted)}
+.meeting-minutes-conclusion{margin:0 0 8px 14px!important;color:var(--accent);font-weight:500}
+.meeting-minutes-steps{list-style:none;padding-left:4px!important}
