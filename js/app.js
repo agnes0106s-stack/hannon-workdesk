@@ -289,7 +289,8 @@ function renderCalendar(c) {
   let ticking = false;
   grid.addEventListener('scroll', () => { if (!ticking) { ticking = true; requestAnimationFrame(() => { ticking = false; sync(); }); } }, { passive: true });
   c.replaceChildren(head, caption, weekdays, grid);
-  if (state.calScroll != null) grid.scrollTop = state.calScroll; else goToday(false);
+  // 앱이 막 켜질 때는 화면 높이가 아직 0일 수 있어, 자리를 잡은 다음 프레임에 한 번 더 맞춘다.
+  if (state.calScroll != null) grid.scrollTop = state.calScroll; else { goToday(false); requestAnimationFrame(() => { if (grid.isConnected) { goToday(false); sync(); } }); }
   sync();
 }
 
