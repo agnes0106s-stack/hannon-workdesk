@@ -7,6 +7,7 @@ import { DataStore } from './data.js';
 import { headerSafeJson } from './dropbox.js';
 import { describe, newUploadId, uploadRecording, UploadStore } from './recorder.js';
 import { speakerLabel } from './util.js';
+import './reminders.js';
 
 const tests = [];
 const test = (name, fn) => tests.push({ name, fn });
@@ -30,6 +31,38 @@ test('allTasks: 저장된 순서, 완료 스냅샷 우선, 직접 추가 포함'
   const ids = allTasks(ctx.indexTasks, c).map(t => t.id);
   eq(ids.slice(0, 4), ['a-partner', 'manual-0a1b2c3d4e5f6071', 'a-schedule', 'b-apply']);
   assert(ids.includes('a-docs'), '완료한 일도 목록에 있음');
+});
+test('reminder: 마감·알림 저장, 형식 검사, 둘 다 비우면 지움', () => {
+  const db = fresh(), c = db.read(CHOICES), ctx = ctxFor(db);
+  OPS.reminder(c, { id: 'a-partner', due: '2026-11-05', at: '' }, ctx);
+  eq(c.reminders['a-partner'].due, '2026-11-05');
+  eq(OPS.reminder(c, { id: 'a-partner', due: '2026-11-05', at: '' }, ctx), NO_CHANGE);
+  throws(() => OPS.reminder(c, { id: 'a-partner', due: '11/5' }, ctx), ValidationError);
+  throws(() => OPS.reminder(c, { id: 'nope', due: '2026-11-05' }, ctx), ValidationError);
+  OPS.reminder(c, { id: 'a-partner', due: '', at: '' }, ctx);
+  eq('a-partner' in c.reminders, false);
+});
+test('meetingFollowup: 고른 행동을 맨 위 할 일로, 마감은 알림으로, 두 번 해도 같음', () => {
+  const c = normalizeChoices({}), ctx = { projectIds: new Set(['inbox', 'p1']) }, mid = 'a'.repeat(32);
+  OPS.meetingFollowup(c, { meeting: mid, title: '회의', project: 'p1', tasks: [{ id: 'manual-1111111111111111', title: '가격표 받기', due: '2026-11-07' }, { id: 'manual-2222222222222222', title: '메일 보내기' }] }, ctx);
+  eq(c.taskOrder.slice(0, 2), ['manual-1111111111111111', 'manual-2222222222222222']);
+  eq(c.savedTasks['manual-1111111111111111'].project, 'p1');
+  eq(c.reminders['manual-1111111111111111'].due, '2026-11-07');
+  eq(c.meetingFollowups[mid].taskIds.length, 2);
+  eq(OPS.meetingFollowup(c, { meeting: mid, tasks: [] }, ctx), NO_CHANGE);
+});
+test('reminders.plan: 정확한 시각·전날 17시·아침 묶음·금요일 점검, 지난 시각은 뺌', () => {
+  const R = globalThis.HannonReminders, now = new Date(2026, 10, 3, 10, 0).getTime();  // 11/3(화) 10:00
+  const tasks = [{ id: 'a', title: '가', project: 'p' }, { id: 'b', title: '나', project: 'p' }];
+  const list = R.plan({ tasks, reminders: { a: { due: '2026-11-05', at: '' }, b: { due: '', at: '2026-11-03T09:00' } }, followups: [], projectName: () => '홍콩' }, now);
+  const ids = list.map(x => x.id);
+  assert(ids.includes('hn-due-a') && !ids.includes('hn-at-b'), '전날 알림 있고 지난 시각은 없음');
+  eq(new Date(list.find(x => x.id === 'hn-due-a').at).getHours(), 17);
+  assert(!ids.includes('hn-morning-2026-11-03') && ids.includes('hn-morning-2026-11-04'), '오늘 아침은 지남');
+  assert(list.find(x => x.id === 'hn-morning-2026-11-05').title.includes('오늘 마감 1개'));
+  assert(ids.includes('hn-friday-2026-11-06'));
+  eq(R.label({ due: '2026-11-02' }, now), '마감 지남 1일');
+  eq(R.snooze('tomorrow', now), '2026-11-04T09:00');
 });
 test('taskCreate: 메모에서 만든 할 일은 메모 내용을 함께 담음', () => {
   const c = normalizeChoices({}), ctx = { projectIds: new Set(['inbox']) };

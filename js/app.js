@@ -3,7 +3,8 @@ import { $, el, button, icon, iconButton, withIcon, hex, shortDate, fullDate, re
 import { RealDropbox, startLogin, finishLoginIfReturning, hasToken } from './dropbox.js';
 import { MockDropbox } from './mock.js';
 import { DataStore } from './data.js';
-import { taskState, meetingPath, FieldConflict, ValidationError } from './ops.js';
+import { taskState, meetingPath, FieldConflict, ValidationError, INDEX as INDEX_PATH } from './ops.js';
+import './reminders.js';
 import { Recorder, UploadStore, uploadRecording, describe, newUploadId, isIOS, pickType, sniffAudio } from './recorder.js';
 
 const MOCK = new URLSearchParams(location.search).get('mock') === '1';
@@ -181,12 +182,14 @@ function render() {
   else if (state.view === 'home') renderHome(c);
   else if (state.view === 'calendar') renderCalendar(c);
   else renderMeetings(c);
+  scheduleReminders();
 }
 
 /** 원격 변경·대기열 변화: 편집 중인 칸은 건드리지 않고 다시 그린다. */
 function softRender() {
   if (!store) return;
   updateChrome();
+  scheduleReminders();
   if (state.dragging) return;
   const c = $('#content');
   const focused = document.activeElement && c.contains(document.activeElement) && ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName);
@@ -451,9 +454,108 @@ function renderHome(c) {
   if (!meetings.length) meet.append(el('p', 'small-empty', '아직 회의가 없어요.'));
   meetings.forEach(m => meet.append(briefRow(m.title || '제목 없음', m.date || '', () => { state.meetingId = m.id; navigate('meetings'); })));
   const grid = el('div', 'home-brief');
+  const follow = pendingFollowups();
+  if (follow.length) {
+    const card = briefCard('회의 후속 정리', 'mic');
+    card.classList.add('followup-card');
+    follow.forEach(m => card.append(briefRow('📝 ' + m.title, (m.actions.length ? '행동 ' + m.actions.length + '개' : '결정 ' + m.decisions.length + '개') + ' · 할 일과 마감 정하기', () => showFollowup(m))));
+    grid.append(card);
+  }
   grid.append(first, radar, meet, fin);
   c.append(grid);
 }
+
+// ---------- 마감·알림, 회의 후속 정리 ----------
+// 마감일(전날 17시 알림·아침 묶음)과 정확한 알림 시각. 실제 예약은 한눈 iPhone 앱이 한다(reminders.js → Swift).
+const R = globalThis.HannonReminders;
+const reminderOf = t => store.choices().reminders?.[t.id];
+function reminderTag(t) {
+  const text = R.label(reminderOf(t));
+  return text ? el('span', 'task-reminder' + (/지남|오늘 마감/.test(text) ? ' urgent' : ''), text) : null;
+}
+function labeled(text, input) { const l = el('label', 'reminder-field'); l.append(el('span', '', text), input); return l; }
+function nextMonday() { const d = new Date(); d.setDate(d.getDate() + ((8 - d.getDay()) % 7 || 7)); return R.ymd(d); }
+function showReminder(t) {
+  const r = reminderOf(t) || {}, today = R.ymd(new Date());
+  const body = openDialog('마감·알림');
+  const due = el('input'); due.type = 'date'; due.value = r.due || '';
+  const when = el('input'); when.type = 'datetime-local'; when.value = r.at || '';
+  const quick = el('div', 'reminder-quick');
+  [['오늘 오후 6시', today + 'T18:00'], ['내일 오전 9시', R.addDays(today, 1) + 'T09:00'], ['다음 주 월요일', nextMonday() + 'T09:00']].forEach(([label, v]) => quick.append(button(label, 'filter', () => { when.value = v; })));
+  const save = (d, a) => {
+    store.queue.enqueue('reminder', { id: t.id, due: d, at: a, task: t }).catch(err => notify(err.message));
+    closeDialog();
+    notify((d || a ? '알림을 정했어요.' : '알림을 지웠어요.') + offlineSuffix());
+  };
+  const acts = el('div', 'dialog-buttons');
+  if (r.due || r.at) acts.append(button('알림 지우기', 'text-button', () => save('', '')));
+  acts.append(button('저장', 'primary-button', () => save(due.value, when.value)));
+  body.append(el('p', 'dialog-title-line', t.title), el('p', 'dialog-text', '마감일을 정하면 전날 오후 5시와 당일 아침 9시에 알려줘요. 알림 시각을 정하면 그 시각에 알려줘요.'), labeled('마감일', due), labeled('알림 시각', when), quick, acts);
+}
+/** AI 회의록이 끝났는데 아직 후속 정리를 안 한 회의(결정·행동이 있는 것만). */
+function pendingFollowups() {
+  const done = store.choices().meetingFollowups || {}, out = [];
+  for (const m of store.meetings()) {
+    if (done[m.id]) continue;
+    const rows = store.processing(m.id)?.processing?.recordings || [];
+    const r = [...rows].reverse().find(x => x?.summary?.status === 'completed')?.summary?.result;
+    if (r && ((r.actions || []).length || (r.decisions || []).length)) out.push({ id: m.id, title: m.title || '회의', date: m.date, project: m.project, decisions: r.decisions || [], actions: r.actions || [] });
+  }
+  return out;
+}
+function showFollowup(m) {
+  const body = openDialog('회의 후속 정리'), proj = projectSelect(m.project || 'inbox');
+  body.append(el('p', 'dialog-title-line', m.title + (m.date ? ' · ' + m.date : '')), el('p', 'dialog-text', '고른 행동만 할 일로 넣어요. 마감일을 정하면 전날 오후 5시와 당일 아침에 알려줘요.'), labeled('프로젝트', proj));
+  if (m.decisions.length) {
+    const box = el('details', 'followup-decisions'), ul = el('ul');
+    box.append(el('summary', '', '결정사항 ' + m.decisions.length + '개 보기'));
+    m.decisions.forEach(x => ul.append(el('li', '', resultText(x))));
+    box.append(ul);
+    body.append(box);
+  }
+  const list = el('div', 'followup-list');
+  const rows = m.actions.map(x => {
+    const row = el('div', 'followup-row'), check = el('input'), input = el('textarea', 'followup-title'), due = el('input', 'followup-due');
+    check.type = 'checkbox'; check.checked = true; check.setAttribute('aria-label', '할 일로 넣기');
+    input.value = resultText(x); input.maxLength = 300; input.rows = 2;
+    due.type = 'date'; due.setAttribute('aria-label', '마감일');
+    row.append(check, input, due);
+    if (x?.check) row.append(el('span', 'meeting-check-mark', '원음 확인'));
+    list.append(row);
+    return { check, input, due };
+  });
+  if (rows.length) body.append(el('p', 'dialog-section', '후속 행동'), list);
+  const save = tasks => {
+    store.queue.enqueue('meetingFollowup', { meeting: m.id, title: m.title, project: proj.value, tasks: tasks.map(x => ({ ...x, id: 'manual-' + hex(8) })), createdAt: new Date().toISOString() }).catch(err => notify(err.message));
+    // 회의 자체의 프로젝트는 맥이 choices 를 받으면 같이 묶는다(server.link_followup_projects).
+    closeDialog();
+    notify((tasks.length ? '할 일 ' + tasks.length + '개를 넣었어요.' : '정리 완료로 표시했어요.') + offlineSuffix());
+  };
+  const acts = el('div', 'dialog-buttons');
+  acts.append(button('나중에', 'text-button', closeDialog), button('할 일 없이 정리 완료', 'secondary-button', () => save([])));
+  if (rows.length) acts.append(button('고른 것 할 일로 넣기', 'primary-button', () => save(rows.filter(r => r.check.checked && r.input.value.trim()).map(r => ({ title: r.input.value.trim(), due: r.due.value })))));
+  body.append(acts);
+}
+/** 앞으로 7일 치 알림을 앱에 넘긴다(같은 목록이면 안 보냄). 달력 탭은 업무판 탭이 맡는다. */
+function scheduleReminders() {
+  if (!store || CALENDAR_ONLY || !store.get(INDEX_PATH)) return;
+  const choices = store.choices();
+  R.send(R.plan({ tasks: store.tasks().filter(t => taskState(choices, t.id) === 'pending'), reminders: choices.reminders || {}, followups: pendingFollowups(), projectName: id => projectOf(id).name }));
+}
+/** 앱이 알림에서 누른 단추를 넘긴다: done · 1h · tomorrow · open. */
+window.hannonReminderAction = (kind, taskId, meetingId) => {
+  if (!store) return;
+  const t = store.tasks().find(x => x.id === taskId);
+  if (kind === 'done' && t) { changeTask(t, 'done'); return; }
+  if ((kind === '1h' || kind === 'tomorrow') && t) {
+    store.queue.enqueue('reminder', { id: t.id, due: reminderOf(t)?.due || '', at: R.snooze(kind), task: t }).catch(err => notify(err.message));
+    notify(kind === '1h' ? '한 시간 뒤에 다시 알려줄게요.' : '내일 아침 9시에 다시 알려줄게요.');
+    return;
+  }
+  const m = meetingId && pendingFollowups().find(x => x.id === meetingId);
+  if (m) { navigate('home').then(() => showFollowup(m)); return; }
+  navigate(t ? 'tasks' : 'home');
+};
 /** 이 기기에 내려받은 자료 전체에서 찾는다(파일 내용과 옛 대화 전문은 맥 검색에서). */
 function renderSearch(c) {
   const choices = store.choices(), q = state.query;
@@ -509,15 +611,20 @@ function renderTasks(c) {
     input.enterKeyHint = 'done';
     input.addEventListener('input', () => { state.taskDraft = input.value; });
     const select = projectSelect(state.project);
+    const due = el('input', 'task-due');
+    due.type = 'date';
+    due.setAttribute('aria-label', '마감일(선택)');
     const add = el('button', 'primary-button', '추가');
     add.type = 'submit';
-    form.append(input, select, add);
+    form.append(input, select, due, add);
     form.addEventListener('submit', e => {
       e.preventDefault();
       const title = input.value.trim();
       if (!title) return;
-      store.queue.enqueue('taskCreate', { id: 'manual-' + hex(8), title, project: select.value, createdAt: new Date().toISOString() })
+      const id = 'manual-' + hex(8);
+      store.queue.enqueue('taskCreate', { id, title, project: select.value, createdAt: new Date().toISOString() })
         .catch(err => notify(err.message));
+      if (due.value) store.queue.enqueue('reminder', { id, due: due.value, at: '', task: { id, title, project: select.value } }).catch(() => {});
       state.taskDraft = '';
       input.value = '';
       notify('맨 위에 추가했어요.' + offlineSuffix());
@@ -566,6 +673,7 @@ function taskRow(t, done, i, rows) {
   const meta = el('div', 'task-context');
   meta.append(el('span', '', projectOf(t.project).name), el('span', 'task-tag', t.manual ? '직접 추가' : t.kind === 'confirmed' ? '확정' : 'AI 제안'));
   if (done) meta.append(el('span', '', shortDate(choices.tasks[t.id]?.updatedAt) + ' 완료'));
+  else { const tag = reminderTag(t); if (tag) meta.append(tag); }
   if (store.queue.items.some(x => x.args?.id === t.id || x.args?.task?.id === t.id)) meta.append(el('span', 'task-pending', '올리는 중'));
   body.append(meta);
   row.append(check, body);
@@ -576,7 +684,7 @@ function taskRow(t, done, i, rows) {
     const down = button('↓', 'move-button', () => moveBy(t, 1), t.title + ' 아래로');
     up.disabled = i === 0;
     down.disabled = i === rows.length - 1;
-    actions.append(up, down);
+    actions.append(up, down, button(reminderOf(t) ? '알림 수정' : '알림', 'text-button', () => showReminder(t)));
   }
   actions.append(button('더보기', 'text-button', () => taskDetails(t, done)));
   row.append(actions);

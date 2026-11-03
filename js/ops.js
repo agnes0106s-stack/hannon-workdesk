@@ -25,12 +25,12 @@ export const MAX_TEXT_CHARS = 250000;
 const nowIso = () => new Date().toISOString();
 
 export function emptyChoices() {
-  return { favorites: [], tasks: {}, notes: {}, savedTasks: {}, suggestions: {}, decisions: {}, activityProjects: {}, fileProjects: {}, finals: {}, conversationReads: {}, taskOrder: [], revision: 0 };
+  return { favorites: [], tasks: {}, notes: {}, savedTasks: {}, suggestions: {}, decisions: {}, activityProjects: {}, fileProjects: {}, finals: {}, conversationReads: {}, reminders: {}, meetingFollowups: {}, taskOrder: [], revision: 0 };
 }
 export function normalizeChoices(doc) {
   const d = doc && typeof doc === 'object' && !Array.isArray(doc) ? doc : emptyChoices();
   if (!Array.isArray(d.favorites)) d.favorites = [];
-  for (const key of ['tasks', 'notes', 'savedTasks', 'suggestions', 'decisions', 'activityProjects', 'fileProjects', 'finals', 'conversationReads']) if (!d[key] || typeof d[key] !== 'object' || Array.isArray(d[key])) d[key] = {};
+  for (const key of ['tasks', 'notes', 'savedTasks', 'suggestions', 'decisions', 'activityProjects', 'fileProjects', 'finals', 'conversationReads', 'reminders', 'meetingFollowups']) if (!d[key] || typeof d[key] !== 'object' || Array.isArray(d[key])) d[key] = {};
   if (!Array.isArray(d.taskOrder)) d.taskOrder = [];
   if (!Number.isInteger(d.revision)) d.revision = 0;
   return d;
@@ -60,6 +60,13 @@ function knownProject(project, ctx) {
   return project || 'inbox';
 }
 
+function reminderValue(args) {
+  const due = String(args.due || ''), at = String(args.at || '');
+  if (due && !/^\d{4}-\d{2}-\d{2}$/.test(due)) throw new ValidationError('마감일을 확인해주세요.');
+  if (at && !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(at)) throw new ValidationError('알림 시각을 확인해주세요.');
+  return { due, at, updatedAt: nowIso() };
+}
+
 export const choiceOps = {
   /** /api/task: 완료·버리기·다시 꺼내기 */
   taskState(doc, args, ctx) {
@@ -86,6 +93,41 @@ export const choiceOps = {
     if (detail) doc.savedTasks[args.id].evidence = detail;
     doc.taskOrder = [args.id, ...doc.taskOrder.filter(k => k !== args.id)];
     return { id: args.id };
+  },
+  /** /api/reminder: 마감일·알림 시각. 둘 다 비우면 알림 없음. */
+  reminder(doc, args, ctx) {
+    normalizeChoices(doc);
+    const { id } = args;
+    const current = allTasks(ctx?.indexTasks, doc).find(t => t.id === id) || (args.task && args.task.id === id ? args.task : null);
+    if (!current) throw new ValidationError('할 일을 찾지 못했어요.');
+    const value = reminderValue(args);
+    const old = doc.reminders[id];
+    if ((old?.due || '') === value.due && (old?.at || '') === value.at) return NO_CHANGE;
+    if (!doc.savedTasks[id]) doc.savedTasks[id] = { ...current };
+    if (value.due || value.at) doc.reminders[id] = value; else delete doc.reminders[id];
+    return { id };
+  },
+  /** /api/meeting-followup: 고른 행동을 할 일로 만들고 회의를 정리 완료로. ID 는 미리 정해 온다. */
+  meetingFollowup(doc, args, ctx) {
+    normalizeChoices(doc);
+    const meeting = String(args.meeting || '');
+    if (!MEETING_ID.test(meeting)) throw new ValidationError('회의를 찾지 못했어요.');
+    if (doc.meetingFollowups[meeting]) return NO_CHANGE;
+    const project = knownProject(args.project, ctx);
+    const rows = Array.isArray(args.tasks) ? args.tasks : [];
+    if (rows.length > 30) throw new ValidationError('할 일 목록을 확인해주세요.');
+    const title = String(args.title || '회의').slice(0, 200), ids = [];
+    for (const row of rows) {
+      const text = typeof row.title === 'string' ? row.title.trim() : '';
+      if (!text || text.length > 300) throw new ValidationError('할 일을 300자 이내로 적어주세요.');
+      if (!/^manual-[0-9a-f]{16}$/.test(row.id || '')) throw new ValidationError('할 일 ID가 올바르지 않아요.');
+      ids.push(row.id);
+      doc.savedTasks[row.id] = { id: row.id, title: text, project, kind: 'confirmed', manual: true, createdAt: args.createdAt || nowIso(), basis: '회의 후속: ' + title, meeting };
+      if (row.due || row.at) doc.reminders[row.id] = reminderValue(row);
+    }
+    doc.taskOrder = [...ids, ...doc.taskOrder.filter(k => !ids.includes(k))];
+    doc.meetingFollowups[meeting] = { doneAt: nowIso(), project, taskIds: ids };
+    return { ids };
   },
   /** /api/task-move: target 앞(after=false) 또는 뒤(after=true)로 */
   taskMove(doc, args, ctx) {

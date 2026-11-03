@@ -419,3 +419,13 @@ html,body{max-width:100%;overflow-x:clip}
 .meeting-minutes-date{color:var(--muted);font-size:13px}
 .meeting-minutes-note{color:var(--warn);font-size:13px}
 .meeting-check-mark{display:inline-block;margin-left:4px;padding:1px 6px;border-radius:999px;background:var(--warn-bg);color:var(--warn);font-size:11px}
+/* 마감·알림, 회의 후속 정리 */
+.task-reminder{font-size:11px;padding:1px 6px;border-radius:4px;background:var(--soft);color:var(--accent)}.task-reminder.urgent{background:var(--danger-bg);color:var(--danger);font-weight:600}
+.task-compose .task-due{flex:0 0 auto;border:1px solid var(--line);border-radius:7px;padding:6px 7px;font-size:12px;color:var(--muted);background:var(--paper);max-width:140px}
+.dialog-title-line{font-size:15px;font-weight:600;margin-bottom:10px;overflow-wrap:anywhere}
+.reminder-field{display:flex;align-items:center;gap:12px;margin-top:14px;font-size:13px;color:var(--muted)}.reminder-field span{width:64px;flex-shrink:0}.reminder-field input,.reminder-field select{flex:1;min-width:0;border:1px solid var(--line);border-radius:8px;padding:9px 10px;font-size:14px;background:var(--paper);color:var(--ink)}
+.reminder-quick{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}.reminder-quick .filter{border:1px solid var(--line)}
+.followup-decisions{margin-top:16px;font-size:13px;color:var(--muted)}.followup-decisions summary{cursor:pointer;color:var(--accent)}.followup-decisions ul{margin:8px 0 0;padding-left:18px;line-height:1.75}
+.followup-list{display:grid;gap:12px}.followup-row{display:grid;grid-template-columns:22px minmax(0,1fr);gap:6px 8px;align-items:start}.followup-row input[type=checkbox]{width:18px;height:18px;margin:8px 0 0;accent-color:var(--accent)}
+.followup-title{width:100%;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:13px;line-height:1.5;resize:vertical;background:var(--paper);color:var(--ink)}.followup-due{grid-column:2;justify-self:start;border:1px solid var(--line);border-radius:8px;padding:6px 8px;font-size:13px;color:var(--muted);background:var(--paper)}.followup-row .meeting-check-mark{grid-column:2;justify-self:start}
+.followup-card{border-color:var(--warn)!important;background:var(--warn-bg)}
