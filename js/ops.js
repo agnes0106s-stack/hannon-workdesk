@@ -25,12 +25,12 @@ export const MAX_TEXT_CHARS = 250000;
 const nowIso = () => new Date().toISOString();
 
 export function emptyChoices() {
-  return { favorites: [], tasks: {}, notes: {}, savedTasks: {}, suggestions: {}, decisions: {}, activityProjects: {}, fileProjects: {}, finals: {}, conversationReads: {}, reminders: {}, meetingFollowups: {}, taskOrder: [], revision: 0 };
+  return { favorites: [], tasks: {}, notes: {}, savedTasks: {}, suggestions: {}, decisions: {}, activityProjects: {}, fileProjects: {}, finals: {}, conversationReads: {}, reminders: {}, meetingFollowups: {}, meetingCategories: {}, taskOrder: [], revision: 0 };
 }
 export function normalizeChoices(doc) {
   const d = doc && typeof doc === 'object' && !Array.isArray(doc) ? doc : emptyChoices();
   if (!Array.isArray(d.favorites)) d.favorites = [];
-  for (const key of ['tasks', 'notes', 'savedTasks', 'suggestions', 'decisions', 'activityProjects', 'fileProjects', 'finals', 'conversationReads', 'reminders', 'meetingFollowups']) if (!d[key] || typeof d[key] !== 'object' || Array.isArray(d[key])) d[key] = {};
+  for (const key of ['tasks', 'notes', 'savedTasks', 'suggestions', 'decisions', 'activityProjects', 'fileProjects', 'finals', 'conversationReads', 'reminders', 'meetingFollowups', 'meetingCategories']) if (!d[key] || typeof d[key] !== 'object' || Array.isArray(d[key])) d[key] = {};
   if (!Array.isArray(d.taskOrder)) d.taskOrder = [];
   if (!Number.isInteger(d.revision)) d.revision = 0;
   return d;

@@ -42,6 +42,9 @@ function notify(text) {
 function hydrateIcons(root = document) {
   root.querySelectorAll('[data-icon]').forEach(n => { if (!n.firstChild) n.replaceWith(icon(n.dataset.icon)); });
 }
+// 회의 카테고리: 기본(대만·한국·홍콩) + 맥에서 만든 것(choices.meetingCategories).
+const regionNames = () => { const out = { ...REGIONS }; for (const [k, v] of Object.entries(store.choices().meetingCategories || {})) if (v && typeof v.name === 'string') out[k] = v.name; return out; };
+const regionName = id => regionNames()[id] || '';
 const projectOf = id => store.projects().find(p => p.id === id) || { id, name: '분류 대기', color: '#929CA8' };
 const matches = (...values) => !state.query || values.join(' ').toLocaleLowerCase().includes(state.query.toLocaleLowerCase());
 const inProject = row => state.project === 'all' || row.project === state.project;
@@ -957,7 +960,7 @@ function renderMeetings(c) {
 async function renderMeetingList() {
   const list = $('#meeting-list');
   if (!list) return;
-  const meetings = store.meetings().filter(m => matches(m.title, m.notes, m.transcript, REGIONS[m.region]));
+  const meetings = store.meetings().filter(m => matches(m.title, m.notes, m.transcript, regionName(m.region)));
   list.replaceChildren();
   const pendingUploads = uploads ? await uploads.all() : [];
   if (!list.isConnected) return;
@@ -980,7 +983,7 @@ async function renderMeetingList() {
   if (!meetings.length) list.append(el('p', 'meeting-list-empty', store.loaded ? '아직 회의가 없어요. ‘새 녹음’으로 시작해보세요.' : '불러오는 중이에요.'));
   for (const m of meetings) {
     const b = button('', 'meeting-list-item' + (m.id === state.meetingId ? ' active' : ''), () => selectMeeting(m.id));
-    b.append(el('strong', '', m.title || '제목 없는 회의'), el('span', 'meeting-list-meta', (m.date || '') + ' · ' + (REGIONS[m.region] || '지역 미정')), el('span', 'meeting-list-state', meetingStateLabel(m)));
+    b.append(el('strong', '', m.title || '제목 없는 회의'), el('span', 'meeting-list-meta', (m.date || '') + ' · ' + (regionName(m.region) || '분류 없음')), el('span', 'meeting-list-state', meetingStateLabel(m)));
     list.append(b);
   }
 }
@@ -1165,7 +1168,7 @@ function renderMeetingDetail() {
   title.maxLength = 200;
   title.setAttribute('aria-label', '회의 제목');
   title.addEventListener('input', () => meetingInput('title', title.value));
-  const meta = el('p', 'meeting-meta-line', [m.date, REGIONS[m.region] || '지역 미정', spokenLabel(m.languages) || LANGUAGES[m.language] || '', m.participants ? m.participants + '명' : '', (m.recordings?.length || 0) + '개 녹음', '수정 ' + relative(m.updatedAt)].filter(Boolean).join(' · '));
+  const meta = el('p', 'meeting-meta-line', [m.date, regionName(m.region) || '분류 없음', spokenLabel(m.languages) || LANGUAGES[m.language] || '', m.participants ? m.participants + '명' : '', (m.recordings?.length || 0) + '개 녹음', '수정 ' + relative(m.updatedAt)].filter(Boolean).join(' · '));
   const conflict = el('div', 'meeting-conflict');
   conflict.id = 'meeting-conflict';
   conflict.hidden = true;
@@ -1343,8 +1346,9 @@ function openRecorder(meetingId = null) {
   const title = el('input'); title.maxLength = 200; title.placeholder = localDay() + ' 폰 녹음';
   const date = el('input'); date.type = 'date'; date.value = localDay();
   const region = el('select');
-  Object.entries(REGIONS).forEach(([k, v]) => { const o = el('option', '', v); o.value = k; region.append(o); });
+  Object.entries(regionNames()).forEach(([k, v]) => { const o = el('option', '', v); o.value = k; region.append(o); });
   region.value = storageGet('hannon.region', 'taiwan');
+  if (!region.value) region.value = 'taiwan';
   // 쓰는 언어는 최대 3개까지 고른다. 안 고르면 자동 인식.
   let chosen = (() => { try { const v = JSON.parse(storageGet('hannon.languages', '[]')); return Array.isArray(v) ? v.filter(c => SPOKEN[c]).slice(0, 3) : []; } catch { return []; } })();
   const language = el('div', 'language-picker');
