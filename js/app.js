@@ -970,6 +970,7 @@ function askCard() {
   if (ask.input.value !== ask.question) ask.input.value = ask.question;
   const go = el('button', 'primary-button', ask.busy ? '찾는 중…' : '물어보기'); go.type = 'submit'; go.disabled = ask.busy;
   form.append(ask.input, go);
+  if (ask.data && !ask.busy) form.append(button('답 닫기', 'secondary-button', () => { ask.data = null; renderMeetingList(); }));
   form.addEventListener('submit', e => { e.preventDefault(); askQuestion(); });
   card.append(form);
   const d = ask.data;
@@ -991,7 +992,6 @@ function askCard() {
       });
       box.append(src);
     }
-    box.append(button('답 닫기', 'text-button', () => { ask.data = null; renderMeetingList(); }));
     card.append(box);
   }
   return card;
