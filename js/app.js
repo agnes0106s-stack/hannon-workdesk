@@ -957,6 +957,64 @@ function renderMeetings(c) {
   renderMeetingList();
   renderMeetingDetail();
 }
+// 🔎 회의록에 물어보기: 질문을 드롭박스 /asks/<id>.json으로 보내면 맥이 회의록을 읽고 /asks/<id>.answer.json에 답을 둔다.
+const ask = { question: '', busy: false, data: null, input: null };
+function askCard() {
+  if (!ask.input) {
+    ask.input = el('input', 'meeting-ask-input');
+    ask.input.type = 'search'; ask.input.maxLength = 300; ask.input.placeholder = '예: COOKTION이랑 정한 납기 뭐였지?';
+    ask.input.setAttribute('aria-label', '회의록에 물어보기');
+    ask.input.addEventListener('input', () => { ask.question = ask.input.value; });
+  }
+  const card = el('section', 'meeting-ask'), form = el('form', 'meeting-ask-form');
+  if (ask.input.value !== ask.question) ask.input.value = ask.question;
+  const go = el('button', 'primary-button', ask.busy ? '찾는 중…' : '물어보기'); go.type = 'submit'; go.disabled = ask.busy;
+  form.append(ask.input, go);
+  form.addEventListener('submit', e => { e.preventDefault(); askQuestion(); });
+  card.append(form);
+  const d = ask.data;
+  if (ask.busy) card.append(el('p', 'meeting-muted', '맥이 회의록을 읽고 답을 찾고 있어요. 30초쯤 걸려요…'));
+  else if (d?.status === 'failed') card.append(el('p', 'meeting-ask-error', d.error || '답을 받지 못했어요.'));
+  else if (d?.status === 'done') {
+    const box = el('div', 'meeting-ask-answer');
+    box.append(el('p', 'meeting-ask-q', 'Q. ' + d.question));
+    String(d.answer || '').replace(/\*\*/g, '').split('\n').filter(x => x.trim()).forEach(line => box.append(el('p', '', line)));
+    if (Array.isArray(d.sources) && d.sources.length) {
+      const groups = new Map();
+      d.sources.forEach(s => { const g = groups.get(s.id) || { ...s, quotes: [] }; if (s.quote) g.quotes.push(s.quote); groups.set(s.id, g); });
+      const src = el('div', 'meeting-ask-sources'); src.append(el('span', 'meeting-ask-label', '근거 회의'));
+      groups.forEach(s => {
+        const b = button('', 'meeting-ask-source', () => { if (store.meeting(s.id)) selectMeeting(s.id); else notify('폰에 아직 없는 회의예요. 잠시 뒤 다시 눌러 주세요.'); });
+        b.append(el('strong', '', s.title || '회의'));
+        s.quotes.slice(0, 3).forEach(q => b.append(el('span', '', '“' + q + '”')));
+        src.append(b);
+      });
+      box.append(src);
+    }
+    box.append(button('답 닫기', 'text-button', () => { ask.data = null; renderMeetingList(); }));
+    card.append(box);
+  }
+  return card;
+}
+async function askQuestion() {
+  const question = ask.question.trim();
+  if (!question || ask.busy) return;
+  if (store.macState() === 'off') { ask.data = { status: 'failed', error: '맥이 꺼져 있어서 지금은 답할 수 없어요. 맥이 켜지면 다시 물어봐 주세요.' }; renderMeetingList(); return; }
+  ask.busy = true; ask.data = null; renderMeetingList();
+  const id = hex(8), path = '/asks/' + id + '.json';
+  try {
+    await dbx.upload(path, new Blob([JSON.stringify({ question, region: 'all', at: new Date().toISOString() })]), null);
+    let answer = null;
+    for (let i = 0; i < 80 && !answer; i++) {
+      await new Promise(r => setTimeout(r, 3000));
+      try { answer = (await dbx.downloadJSON('/asks/' + id + '.answer.json')).json; }
+      catch (e) { if (e.code !== 'not_found') throw e; }
+    }
+    ask.data = answer ? { ...answer, question } : { status: 'failed', error: '맥에서 답이 오지 않았어요. 맥이 켜져 있는지 확인해 주세요.' };
+  } catch (e) { ask.data = { status: 'failed', error: e.message || '질문을 보내지 못했어요.' }; }
+  ask.busy = false;
+  if ($('#meeting-list')) renderMeetingList();
+}
 async function renderMeetingList() {
   const list = $('#meeting-list');
   if (!list) return;
@@ -979,6 +1037,7 @@ async function renderMeetingList() {
     box.append(el('p', 'meeting-muted', store.macState() === 'on' ? '맥이 곧 받아쓰고 요약해요.' : '맥이 켜지면 받아쓰기·요약돼요.'));
     list.append(box);
   }
+  list.append(askCard());
   list.append(el('div', 'meeting-list-count', meetings.length + '개 회의'));
   if (!meetings.length) list.append(el('p', 'meeting-list-empty', store.loaded ? '아직 회의가 없어요. ‘새 녹음’으로 시작해보세요.' : '불러오는 중이에요.'));
   for (const m of meetings) {
