@@ -166,8 +166,37 @@ function setProject(id) {
   render();
 }
 
+// 뒤로가기: 화면을 바꾸거나 회의·메모를 열 때 기록을 하나 쌓고, 뒤로가기(아이폰 앱의 왼쪽 끝 밀기 포함)가 오면
+// 가장 위의 것(열린 회의 → 열린 메모 → 이전 화면)부터 닫는다.
+const viewStack = [];
+let goingBack = false;
+function pushBack(kind) { if (!goingBack) history.pushState({ hannon: kind }, ''); }
+async function goBack() {
+  goingBack = true;
+  try {
+    if (state.view === 'meetings' && state.meetingId) { await saveMeeting(); state.meetingId = null; state.draft = null; renderMeetings($('#content')); }
+    else if (state.view === 'notes' && state.note) { await saveNote(); state.note = null; renderNotes($('#content')); }
+    else if (viewStack.length) await navigate(viewStack.pop());
+  } finally { goingBack = false; }
+}
+window.addEventListener('popstate', () => { goBack(); });
+// 화면 안의 「← 목록」 버튼도 같은 기록을 지나가게 해 두 번 눌러야 하는 일이 없게 한다.
+function backOr(close) { return () => history.state?.hannon ? history.back() : close(); }
+// 홈 화면에 추가한 웹앱(사파리 밖)은 밀어서 뒤로가기가 없어서 왼쪽 끝에서 오른쪽으로 밀면 직접 뒤로 간다.
+// 아이폰 앱(WKWebView)과 사파리는 기본 제스처가 있으니 건드리지 않는다.
+if (!IN_APP && (navigator.standalone || window.matchMedia('(display-mode: standalone)').matches)) {
+  let sx = null, sy = 0;
+  window.addEventListener('touchstart', e => { const t = e.touches[0]; sx = e.touches.length === 1 && t.clientX < 24 ? t.clientX : null; sy = t.clientY; }, { passive: true });
+  window.addEventListener('touchend', e => {
+    if (sx == null) return;
+    const t = e.changedTouches[0], dx = t.clientX - sx, dy = Math.abs(t.clientY - sy); sx = null;
+    if (dx > 70 && dy < 60 && history.state?.hannon) history.back();
+  }, { passive: true });
+}
+
 async function navigate(view) {
   if (!(await flushEditors())) return;
+  if (view !== state.view) { if (!goingBack) viewStack.push(state.view); pushBack('view'); }
   state.view = view;
   if (!CALENDAR_ONLY) storageSet('hannon.view', view);
   if (view !== 'notes') state.note = null;
@@ -808,12 +837,14 @@ async function newNote() {
   state.view = 'notes';
   storageSet('hannon.view', 'notes');
   state.archivedNotes = false;
+  if (!state.note) pushBack('note');
   state.note = { id: 'note-' + hex(8), title: '', body: '', category: ['all', ''].includes(state.noteCategory) ? '' : state.noteCategory, archived: false, baseRevision: 0, isNew: true, dirty: false, saves: 0 };
   render();
   $('#note-title')?.focus();
 }
 async function selectNote(note) {
   await saveNote();
+  if (!state.note) pushBack('note');
   state.note = { id: note.id, title: note.title, body: note.body, category: note.category || '', archived: !!note.archived, baseRevision: note.revision, isNew: false, dirty: false, saves: 0 };
   renderNotes($('#content'));
   if (window.matchMedia('(max-width: 650px)').matches) $('.note-editor')?.scrollIntoView({ block: 'start' });
@@ -896,7 +927,7 @@ function renderNotes(c) {
     return;
   }
   const controls = el('div', 'note-controls');
-  const back = button('← 목록', 'text-button note-back', async () => { await saveNote(); state.note = null; renderNotes(c); });
+  const back = button('← 목록', 'text-button note-back', backOr(async () => { await saveNote(); state.note = null; renderNotes(c); }));
   const select = noteCategoryInput(n.category || '');
   const status = el('span', 'save-status', n.dirty ? '저장 대기…' : n.isNew ? '새 메모' : '자동 저장됨');
   status.id = 'note-save-status';
@@ -1048,6 +1079,7 @@ async function renderMeetingList() {
 }
 async function selectMeeting(id) {
   await saveMeeting();
+  if (!state.meetingId) pushBack('meeting');
   state.meetingId = id;
   state.draft = null;
   renderMeetings($('#content'));
@@ -1221,7 +1253,7 @@ function renderMeetingDetail() {
   actions.append(save);
   if (!IN_APP) actions.append(withIcon('mic', '이 회의에 녹음 추가', 'secondary-button', () => openRecorder(m.id)));
   actions.append(button('회의 삭제', 'text-button meeting-delete', () => deleteMeeting(m)));
-  head.append(button('← 회의 목록', 'text-button meeting-back', async () => { await saveMeeting(); state.meetingId = null; state.draft = null; renderMeetings($('#content')); }), actions);
+  head.append(button('← 회의 목록', 'text-button meeting-back', backOr(async () => { await saveMeeting(); state.meetingId = null; state.draft = null; renderMeetings($('#content')); })), actions);
   const title = el('input', 'meeting-title');
   title.value = d.values.title;
   title.maxLength = 200;
@@ -1258,6 +1290,19 @@ function renderMeetingDetail() {
 }
 
 /** 맥이 만든 회의록 마크다운을 안전하게(textContent) 그린다: #·##·### 제목, - 목록, 1. 번호, ※ 주석. */
+// 공유용으로 다듬는다: 직원에게 확인을 부탁하는 머리·맺음 문장을 빼고, 메신저가 ~…~ 를 취소선으로 바꾸지 않게 물결표를 ∼ 로.
+const ASK_LINE = /(부탁\S*|바랍니다|주세요|감사합니다)[.!~]*\s*$/;
+function tidyMinutes(text) {
+  let lines = String(text).split('\n');
+  const bar = l => /^━{3,}/.test(l.trim());
+  const first = lines.findIndex(bar);
+  if (first > 0) lines = lines.filter((l, i) => i >= first || !ASK_LINE.test(l.trim()));
+  let last = -1;
+  lines.forEach((l, i) => { if (bar(l)) last = i; });
+  if (last >= 0 && lines.slice(last + 1).every(l => !l.trim() || ASK_LINE.test(l.trim()))) lines = lines.slice(0, last);
+  return lines.join('\n').replace(/~/g, '∼').trim();
+}
+
 function renderMinutes(text) {
   const box = el('div', 'meeting-minutes'); let list = null;
   for (const raw of text.replace(/\*\*(.+?)\*\*/g, '$1').split('\n')) {
@@ -1305,10 +1350,10 @@ function renderProcessing() {
     let lists = box;
     if (minutes) {
       const copy = button('회의록 복사', 'secondary-button meeting-copy', async () => {
-        try { await navigator.clipboard.writeText(minutes.replace(/\*\*(.+?)\*\*/g, '$1').replace(/^#{1,4}\s+/gm, '')); notify('회의록을 복사했어요.'); }
+        try { await navigator.clipboard.writeText(tidyMinutes(minutes).replace(/\*\*(.+?)\*\*/g, '$1').replace(/^#{1,4}\s+/gm, '')); notify('회의록을 복사했어요.'); }
         catch { notify('복사하지 못했어요.'); }
       });
-      box.append(copy, renderMinutes(minutes));
+      box.append(copy, renderMinutes(tidyMinutes(minutes)));
       lists = el('details', 'meeting-summary-evidence'); lists.append(el('summary', '', '결정·할 일 목록'));
       box.append(lists);
     } else box.append(el('p', 'meeting-generated-text', r.summary));
