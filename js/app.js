@@ -1345,7 +1345,7 @@ function renderProcessing() {
   if (summarized) {
     const r = summarized.summary.result, box = el('div', 'meeting-summary-result');
     const minutes = typeof r.minutes === 'string' && r.minutes.trim() ? r.minutes : '';
-    box.append(el('p', 'meeting-review-label', 'AI 회의록 초안 · ' + (r.processing === 'claude' ? 'Claude' : '맥 안 AI') + ' · 결정과 할 일은 원음을 확인한 뒤 확정해주세요.'));
+    box.append(el('p', 'meeting-review-label', 'AI 회의록 · ' + (r.processing === 'claude' ? 'Claude' : '맥 안 AI') + ' 정리 · AI가 쓴 글이라 틀린 곳이 있을 수 있어요.' + (r.processing !== 'claude' && (r.fallback || String((r.warnings || [])[0] || '').startsWith('Claude 정리에 실패')) ? ' Claude가 실패해 간단히만 정리됐어요. 맥에서 「Claude로 다시 정리」를 눌러 주세요.' : '')));
     // Claude 가 만든 정식 회의록(마크다운)이 있으면 그것을 먼저, 결정·할 일 목록은 접어 둔다(맥 화면과 같은 구성).
     let lists = box;
     if (minutes) {
