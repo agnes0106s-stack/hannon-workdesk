@@ -452,3 +452,12 @@ html,body{max-width:100%;overflow-x:clip}
 .meeting-ask-answer .text-button{justify-self:start;padding-left:0}
 .meeting-ask-error{color:#b3261e;font-size:13px;margin:0}
 @media (prefers-color-scheme: dark){.meeting-ask{background:#1c2430;border-color:#2c3646}.meeting-ask-source,.meeting-ask-input{background:#141a22;border-color:#2c3646;color:inherit}.meeting-ask-q{color:#c9d4e6}}
+
+/* 폰 화면 정리: 메뉴를 한 줄로, 제목 아래 설명 글은 숨기고, 후속 정리의 나머지 일은 접는다 */
+.followup-more{margin-top:10px}.followup-more>summary{cursor:pointer;color:var(--muted);font-size:13px;padding:8px 0}.followup-more .followup-list{margin-top:8px}
+@media(max-width:650px){
+  .main-nav{grid-template-columns:repeat(6,minmax(0,1fr));gap:2px}
+  .in-app .main-nav{grid-template-columns:repeat(5,minmax(0,1fr));gap:4px}
+  .page-heading p{display:none}
+  .page-heading{margin-bottom:14px}
+}

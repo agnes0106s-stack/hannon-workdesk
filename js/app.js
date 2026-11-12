@@ -470,7 +470,10 @@ function renderHome(c) {
   const todo = store.tasks().filter(t => taskState(choices, t.id) === 'pending');
   const first = briefCard('먼저 할 일', 'check', button('모두 보기', 'text-button', () => navigate('tasks')));
   if (!todo.length) first.append(el('p', 'small-empty', '남은 할 일이 없어요.'));
-  todo.slice(0, 5).forEach((t, i) => first.append(briefRow((i + 1) + '. ' + t.title, projectOf(t.project).name, () => navigate('tasks'))));
+  todo.slice(0, 5).forEach((t, i) => {
+    const due = choices.reminders?.[t.id]?.due, meta = [t.project && t.project !== 'inbox' ? projectOf(t.project).name : '', due ? '마감 ' + due.slice(5).replace('-', '/') : ''].filter(Boolean).join(' · ');
+    first.append(briefRow((i + 1) + '. ' + String(t.title || '').replace(/^\(나\)\s*[:：]\s*/, ''), meta, () => navigate('tasks')));
+  });
   const radar = briefCard('업무 레이더', 'radar');
   let warned = 0;
   (r.staleProjects || []).forEach(x => { warned++; radar.append(briefRow('⚠ ' + x.name + (x.days == null ? ' · 대화 기록 없음' : ' · ' + x.days + '일째 손 안 댐'), '할 일 ' + x.openTasks + '개', () => { state.project = x.project; navigate('tasks'); })); });
@@ -479,7 +482,6 @@ function renderHome(c) {
   if (!warned) radar.append(el('p', 'small-empty', '지금은 경고할 게 없어요.'));
   const finals = allFiles().filter(f => f.final);
   const fin = briefCard('최종본', 'document');
-  if (!finals.length) fin.append(el('p', 'small-empty', '결과물 목록에서 "최종본"을 누르면 여기 모여요.'));
   finals.slice(0, 5).forEach(f => fin.append(briefRow(f.title || f.name, projectOf(f.project).name)));
   const meetings = store.meetings().sort((a, b) => String(b.date || '').localeCompare(String(a.date || ''))).slice(0, 3);
   const meet = briefCard('최근 회의', 'mic', button('회의록', 'text-button', () => navigate('meetings')));
@@ -490,10 +492,11 @@ function renderHome(c) {
   if (follow.length) {
     const card = briefCard('회의 후속 정리', 'mic');
     card.classList.add('followup-card');
-    follow.forEach(m => card.append(briefRow('📝 ' + m.title, (m.actions.length ? '행동 ' + m.actions.length + '개' : '결정 ' + m.decisions.length + '개') + ' · 할 일과 마감 정하기', () => showFollowup(m))));
+    follow.forEach(m => card.append(briefRow('📝 ' + m.title, (m.actions.length ? '챙길 일 ' + Math.min(m.actions.length, 5) + '개' : '결정 ' + m.decisions.length + '개') + ' · 할 일과 마감 정하기', () => showFollowup(m))));
     grid.append(card);
   }
-  grid.append(first, radar, meet, fin);
+  grid.append(first, radar, meet);
+  if (finals.length) grid.append(fin);
   c.append(grid);
 }
 
@@ -537,7 +540,7 @@ function pendingFollowups() {
 }
 function showFollowup(m) {
   const body = openDialog('회의 후속 정리'), proj = projectSelect(m.project || 'inbox');
-  body.append(el('p', 'dialog-title-line', m.title + (m.date ? ' · ' + m.date : '')), el('p', 'dialog-text', '고른 행동만 할 일로 넣어요. 마감일을 정하면 전날 오후 5시와 당일 아침에 알려줘요.'), labeled('프로젝트', proj));
+  body.append(el('p', 'dialog-title-line', m.title + (m.date ? ' · ' + m.date : '')), el('p', 'dialog-text', '꼭 챙길 일만 골라 두었어요. 체크된 것만 할 일로 들어가고, 마감일을 정하면 전날 오후 5시와 당일 아침에 알려줘요.'), labeled('프로젝트', proj));
   if (m.decisions.length) {
     const box = el('details', 'followup-decisions'), ul = el('ul');
     box.append(el('summary', '', '결정사항 ' + m.decisions.length + '개 보기'));
@@ -545,18 +548,22 @@ function showFollowup(m) {
     box.append(ul);
     body.append(box);
   }
-  const list = el('div', 'followup-list');
-  const rows = m.actions.map(x => {
+  // 꼭 챙길 일만: 내가 할 일을 앞에 두고 5개까지만 체크해 보여 주고, 나머지는 접어 둔다(맥과 같은 규칙).
+  const mine = x => !/^\s*\(?상대/.test(resultText(x)), ordered = [...m.actions.filter(mine), ...m.actions.filter(x => !mine(x))], KEEP = 5;
+  const list = el('div', 'followup-list'), more = el('details', 'followup-more'), moreList = el('div', 'followup-list');
+  const rows = ordered.map((x, i) => {
+    const top = i < KEEP && mine(x) || i < Math.min(KEEP, 3);
     const row = el('div', 'followup-row'), check = el('input'), input = el('textarea', 'followup-title'), due = el('input', 'followup-due');
-    check.type = 'checkbox'; check.checked = true; check.setAttribute('aria-label', '할 일로 넣기');
-    input.value = resultText(x); input.maxLength = 300; input.rows = 2;
+    check.type = 'checkbox'; check.checked = top; check.setAttribute('aria-label', '할 일로 넣기');
+    input.value = resultText(x).replace(/^\(나\)\s*[:：]\s*/, ''); input.maxLength = 300; input.rows = 2;
     due.type = 'date'; due.setAttribute('aria-label', '마감일');
     row.append(check, input, due);
     if (x?.check) row.append(el('span', 'meeting-check-mark', '원음 확인'));
-    list.append(row);
+    (top ? list : moreList).append(row);
     return { check, input, due };
   });
-  if (rows.length) body.append(el('p', 'dialog-section', '후속 행동'), list);
+  if (rows.length) body.append(el('p', 'dialog-section', '꼭 챙길 일'), list);
+  if (moreList.children.length) { more.append(el('summary', '', '그 밖의 일 ' + moreList.children.length + '개 보기 (필요한 것만 체크)'), moreList); body.append(more); }
   const save = tasks => {
     store.queue.enqueue('meetingFollowup', { meeting: m.id, title: m.title, project: proj.value, tasks: tasks.map(x => ({ ...x, id: 'manual-' + hex(8) })), createdAt: new Date().toISOString() }).catch(err => notify(err.message));
     // 회의 자체의 프로젝트는 맥이 choices 를 받으면 같이 묶는다(server.link_followup_projects).
