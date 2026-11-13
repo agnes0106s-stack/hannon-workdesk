@@ -472,7 +472,12 @@ function renderHome(c) {
   if (!todo.length) first.append(el('p', 'small-empty', '남은 할 일이 없어요.'));
   todo.slice(0, 5).forEach((t, i) => {
     const due = choices.reminders?.[t.id]?.due, meta = [t.project && t.project !== 'inbox' ? projectOf(t.project).name : '', due ? '마감 ' + due.slice(5).replace('-', '/') : ''].filter(Boolean).join(' · ');
-    first.append(briefRow((i + 1) + '. ' + String(t.title || '').replace(/^\(나\)\s*[:：]\s*/, ''), meta, () => navigate('tasks')));
+    // 오늘 화면에서 바로 완료 체크(맥과 같게).
+    const line = el('div', 'brief-task'), check = el('input', 'brief-check');
+    check.type = 'checkbox'; check.setAttribute('aria-label', t.title + ' 완료로 표시');
+    check.addEventListener('change', () => { check.disabled = true; changeTask(t, 'done'); });
+    line.append(check, briefRow((i + 1) + '. ' + String(t.title || '').replace(/^\(나\)\s*[:：]\s*/, ''), meta, () => navigate('tasks')));
+    first.append(line);
   });
   const radar = briefCard('업무 레이더', 'radar');
   let warned = 0;
@@ -630,7 +635,7 @@ function visibleTasks(status) {
 }
 function changeTask(t, next) {
   store.queue.enqueue('taskState', { id: t.id, state: next, task: t }).catch(() => {});
-  notify((next === 'done' ? '완료함에 보관했어요.' : next === 'dismissed' ? '목록에서 뺐어요.' : '할 일로 다시 꺼냈어요.') + offlineSuffix());
+  notify((next === 'done' ? '완료함에 보관했어요.' : next === 'dismissed' ? '할 일을 지웠어요.' : '할 일로 다시 꺼냈어요.') + offlineSuffix());
 }
 function moveTask(id, target, after) {
   store.queue.enqueue('taskMove', { id, target, after }).catch(() => {});
@@ -742,7 +747,7 @@ function taskDetails(t, done) {
   body.append(el('div', 'dialog-text', t.basis || '직접 추가한 할 일'));
   if (t.evidence) body.append(el('p', 'dialog-section', '내용'), el('div', 'dialog-text', t.evidence));
   const row = el('div', 'dialog-buttons');
-  if (!done) row.append(button('목록에서 빼기', 'secondary-button', () => { closeDialog(); changeTask(t, 'dismissed'); }));
+  row.append(button('지우기', 'secondary-button task-remove', () => { closeDialog(); changeTask(t, 'dismissed'); }));
   row.append(button('닫기', 'text-button', closeDialog));
   body.append(row);
 }

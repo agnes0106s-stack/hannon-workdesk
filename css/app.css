@@ -461,3 +461,16 @@ html,body{max-width:100%;overflow-x:clip}
   .page-heading p{display:none}
   .page-heading{margin-bottom:14px}
 }
+
+/* 읽기 쉽게·누르기 쉽게: 흐린 글자는 진하게, 10~11px 글자는 12px로, 누르는 곳은 36px 이상 */
+.brief-meta{color:var(--muted)}
+.brief-task{display:flex;align-items:center;gap:4px}.brief-task .brief-row{flex:1;min-width:0}.brief-check{width:20px;height:20px;margin:0 4px 0 2px;accent-color:var(--accent);flex-shrink:0}
+.task-remove{color:var(--danger,#b4534a)}
+button:focus-visible,a:focus-visible,select:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media(max-width:650px){
+  .brief-meta,.task-tag,.meeting-list-meta,.meeting-list-state,.meeting-list-count,.project-stage{font-size:12px}
+  .text-button{font-size:13px;min-height:36px;padding:8px 6px}
+  .filter{min-height:36px}
+  .icon-button{min-width:40px;min-height:40px}
+  .brief-row{padding-top:9px;padding-bottom:9px}
+}
