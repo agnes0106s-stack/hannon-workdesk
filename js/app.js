@@ -8,7 +8,7 @@ import './reminders.js';
 import { Recorder, UploadStore, uploadRecording, describe, newUploadId, isIOS, pickType, sniffAudio } from './recorder.js';
 
 const MOCK = new URLSearchParams(location.search).get('mock') === '1';
-const BUILD = '30';  // version.js 와 같게 올린다.
+const BUILD = '31';  // version.js 와 같게 올린다.
 // 새 버전이 올라왔으면 화면으로 돌아올 때 스스로 다시 연다(아이폰 앱은 껐다 켜기 전까지 같은 화면을 계속 들고 있다).
 // 녹음·입력·올리는 중에는 미룬다.
 let versionCheckedAt = 0;
@@ -478,7 +478,7 @@ function briefRow(text, meta, fn) {
   if (meta) row.append(el('span', 'brief-meta', meta));
   return row;
 }
-// 매일 루틴: 체크는 날마다 새로 시작한다. 밤 10시·11시 30분에 안 한 것만 알린다(알림 계획은 reminders.js, 맥과 같은 규칙).
+// 매일 루틴: 체크는 날마다 새로 시작한다. 밤 11시에 안 한 것만 한 번 알린다(알림 계획은 reminders.js, 맥과 같은 규칙).
 function routineCard() {
   const RM = globalThis.HannonReminders, day = RM.ymd(new Date()), routines = store.choices().routines || {};
   const all = Object.values(routines).filter(r => r && !r.removed), rows = RM.routineRows(routines, day), left = rows.filter(r => !r.done).length;
@@ -505,7 +505,7 @@ function routineCard() {
     notify('루틴을 추가했어요.' + offlineSuffix());
   });
   card.append(form);
-  if (all.length) card.append(el('p', 'routine-hint', '밤 10시와 11시 30분에, 안 한 것만 알려줘요.'));
+  if (all.length) card.append(el('p', 'routine-hint', '밤 11시에, 안 한 것만 한 번 알려줘요.'));
   return card;
 }
 function manageRoutines() {

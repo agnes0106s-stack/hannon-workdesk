@@ -32,13 +32,12 @@
   function plan({ tasks = [], reminders = {}, followups = [], routines = {}, projectName = () => '' }, now = Date.now()) {
     const out = [], today = ymd(new Date(now));
     const push = x => { if (x.at > now + 30000) out.push(x); };
-    // 매일 루틴: 밤 10시에 아직 안 한 것만 묶어 한 번, 11시 30분에 그래도 남았으면 한 번 더. 다 한 날은 울리지 않는다.
+    // 매일 루틴: 밤 11시에 아직 안 한 것만 묶어 한 번. 다 한 날은 울리지 않는다.
     for (let i = 0; i < 7; i++) {
       const day = addDays(today, i), left = routineRows(routines, day).filter(r => !r.done);
       if (!left.length) continue;
       const body = left.slice(0, 6).map(r => clip(r.title, 20)).join(', ') + (left.length > 6 ? ' 외 ' + (left.length - 6) + '개' : '');
-      push({ id: 'hn-routine-a-' + day, at: at(day, 22), title: '오늘 루틴 ' + left.length + '개가 남았어요', body });
-      push({ id: 'hn-routine-b-' + day, at: at(day, 23, 30), title: '자정 전 마지막 알림 · 루틴 ' + left.length + '개', body });
+      push({ id: 'hn-routine-' + day, at: at(day, 23), title: '오늘 루틴 ' + left.length + '개가 남았어요', body });
     }
     const named = t => { const p = projectName(t.project); return p && p !== '분류 대기' ? p + ': ' + clip(t.title) : clip(t.title, 60); };
     for (const t of tasks) {
