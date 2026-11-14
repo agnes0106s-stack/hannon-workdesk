@@ -8,6 +8,21 @@ import './reminders.js';
 import { Recorder, UploadStore, uploadRecording, describe, newUploadId, isIOS, pickType, sniffAudio } from './recorder.js';
 
 const MOCK = new URLSearchParams(location.search).get('mock') === '1';
+const BUILD = '30';  // version.js 와 같게 올린다.
+// 새 버전이 올라왔으면 화면으로 돌아올 때 스스로 다시 연다(아이폰 앱은 껐다 켜기 전까지 같은 화면을 계속 들고 있다).
+// 녹음·입력·올리는 중에는 미룬다.
+let versionCheckedAt = 0;
+async function checkVersion() {
+  if (MOCK || document.hidden || Date.now() - versionCheckedAt < 60000) return;
+  versionCheckedAt = Date.now();
+  try {
+    const latest = (await import('../version.js?t=' + Date.now())).BUILD;
+    const busy = document.querySelector('dialog[open]') || document.querySelector('#recording-bar:not([hidden])') || ['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName) || store?.queue?.items?.length;
+    if (latest && latest !== BUILD && !busy) location.reload();
+  } catch { /* 오프라인이면 다음에 */ }
+}
+document.addEventListener('visibilitychange', checkVersion);
+setInterval(checkVersion, 15 * 60000);
 // 한눈 iPhone 앱 안에서 열리면 녹음은 앱의 녹음 탭이 맡는다.
 const IN_APP = /HannonApp\//.test(navigator.userAgent);
 if (IN_APP) document.documentElement.classList.add('in-app');
@@ -126,7 +141,7 @@ function renderStatus() {
   else { text = '실시간 연결됨'; cls = ''; }
   $('#sync-text').textContent = text;
   $('#sync-dot').className = 'local-dot ' + cls;
-  $('#footer-sync').textContent = (MOCK ? '테스트 모드(가짜 드롭박스) · ' : '드롭박스 앱 폴더 · ') + text;
+  $('#footer-sync').textContent = (MOCK ? '테스트 모드(가짜 드롭박스) · ' : '드롭박스 앱 폴더 · ') + text + ' · 화면 v' + BUILD;
   renderBanners();
 }
 
