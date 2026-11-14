@@ -25,12 +25,12 @@ export const MAX_TEXT_CHARS = 250000;
 const nowIso = () => new Date().toISOString();
 
 export function emptyChoices() {
-  return { favorites: [], tasks: {}, notes: {}, savedTasks: {}, suggestions: {}, decisions: {}, activityProjects: {}, fileProjects: {}, finals: {}, conversationReads: {}, reminders: {}, meetingFollowups: {}, meetingCategories: {}, taskOrder: [], revision: 0 };
+  return { favorites: [], tasks: {}, notes: {}, savedTasks: {}, suggestions: {}, decisions: {}, activityProjects: {}, fileProjects: {}, finals: {}, conversationReads: {}, reminders: {}, routines: {}, meetingFollowups: {}, meetingCategories: {}, taskOrder: [], revision: 0 };
 }
 export function normalizeChoices(doc) {
   const d = doc && typeof doc === 'object' && !Array.isArray(doc) ? doc : emptyChoices();
   if (!Array.isArray(d.favorites)) d.favorites = [];
-  for (const key of ['tasks', 'notes', 'savedTasks', 'suggestions', 'decisions', 'activityProjects', 'fileProjects', 'finals', 'conversationReads', 'reminders', 'meetingFollowups', 'meetingCategories']) if (!d[key] || typeof d[key] !== 'object' || Array.isArray(d[key])) d[key] = {};
+  for (const key of ['tasks', 'notes', 'savedTasks', 'suggestions', 'decisions', 'activityProjects', 'fileProjects', 'finals', 'conversationReads', 'reminders', 'routines', 'meetingFollowups', 'meetingCategories']) if (!d[key] || typeof d[key] !== 'object' || Array.isArray(d[key])) d[key] = {};
   if (!Array.isArray(d.taskOrder)) d.taskOrder = [];
   if (!Number.isInteger(d.revision)) d.revision = 0;
   return d;
@@ -95,6 +95,35 @@ export const choiceOps = {
     return { id: args.id };
   },
   /** /api/reminder: 마감일·알림 시각. 둘 다 비우면 알림 없음. */
+  /** /api/routine: 매일 루틴 추가·고치기·지우기. ID 는 화면이 미리 정해 온다(rt-…). */
+  routine(doc, args) {
+    normalizeChoices(doc);
+    const { id } = args;
+    if (typeof id !== 'string' || !/^rt-[0-9a-f]{8,24}$/.test(id)) throw new ValidationError('루틴을 찾지 못했어요.');
+    if (args.remove === true) {
+      if (!doc.routines[id]) throw new ValidationError('루틴을 찾지 못했어요.');
+      doc.routines[id] = { ...doc.routines[id], removed: true, updatedAt: nowIso() };
+      return { id };
+    }
+    const title = String(args.title || '').replace(/\s+/g, ' ').trim().slice(0, 60), days = args.days || 'daily';
+    if (!title) throw new ValidationError('루틴 이름을 적어 주세요.');
+    if (days !== 'daily' && days !== 'weekdays' && !(Array.isArray(days) && days.length && days.every(d => Number.isInteger(d) && d >= 0 && d <= 6))) throw new ValidationError('반복 요일을 확인해주세요.');
+    const old = doc.routines[id] || {};
+    doc.routines[id] = { id, title, days: Array.isArray(days) ? [...new Set(days)].sort() : days, createdAt: old.createdAt || nowIso(), updatedAt: nowIso(), done: old.done || {} };
+    return { id };
+  },
+  /** /api/routine-check: 그날 했는지 표시(기기 현지 날짜). */
+  routineCheck(doc, args) {
+    normalizeChoices(doc);
+    const { id, day } = args, r = doc.routines[id];
+    if (!r || r.removed || !/^\d{4}-\d{2}-\d{2}$/.test(day || '')) throw new ValidationError('루틴을 찾지 못했어요.');
+    const done = r.done && typeof r.done === 'object' ? r.done : (r.done = {});
+    if (!!done[day] === (args.done === true)) return NO_CHANGE;
+    if (args.done === true) done[day] = true; else delete done[day];
+    for (const old of Object.keys(done).sort().slice(0, -90)) delete done[old];
+    r.updatedAt = nowIso();
+    return { id };
+  },
   reminder(doc, args, ctx) {
     normalizeChoices(doc);
     const { id } = args;

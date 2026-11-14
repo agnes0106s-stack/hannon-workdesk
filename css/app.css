@@ -474,3 +474,11 @@ button:focus-visible,a:focus-visible,select:focus-visible,summary:focus-visible{
   .icon-button{min-width:40px;min-height:40px}
   .brief-row{padding-top:9px;padding-bottom:9px}
 }
+
+/* 매일 루틴 */
+.routine-count{margin-left:8px;font-size:11px;font-weight:600;color:var(--danger,#b4534a);background:color-mix(in srgb,#b4534a 14%,var(--paper));border-radius:999px;padding:2px 8px}.routine-count.clear{color:#3f7d58;background:color-mix(in srgb,#3f7d58 16%,var(--paper))}
+.routine-row.done .brief-text-line{color:var(--faint);text-decoration:line-through}
+.routine-add{display:flex;gap:6px;margin-top:8px}.routine-add input{flex:1;min-width:0;border:1px solid var(--line);border-radius:8px;padding:9px 10px;font:inherit;font-size:16px;background:var(--paper);color:var(--ink)}
+.routine-hint{font-size:12px;color:var(--muted);margin:8px 2px 0}
+.routine-title{width:100%;border:1px solid var(--line);border-radius:8px;padding:9px 10px;font:inherit;font-size:16px;background:var(--paper);color:var(--ink)}
+.routine-days{display:flex;gap:5px;margin:6px 0 4px;flex-wrap:wrap}.routine-days .filter{min-width:38px;min-height:38px;justify-content:center;border:1px solid var(--line)}.routine-days .filter.active{background:var(--accent);color:var(--paper);border-color:var(--accent)}

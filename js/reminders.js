@@ -29,9 +29,17 @@
    * followups: [{id,title}] 후속 정리 안 한 회의, projectName: id→이름.
    * 돌려주는 것: [{id, at(ms), title, body, taskId?, meetingId?}] 앞으로 7일, 최대 60개.
    */
-  function plan({ tasks = [], reminders = {}, followups = [], projectName = () => '' }, now = Date.now()) {
+  function plan({ tasks = [], reminders = {}, followups = [], routines = {}, projectName = () => '' }, now = Date.now()) {
     const out = [], today = ymd(new Date(now));
     const push = x => { if (x.at > now + 30000) out.push(x); };
+    // 매일 루틴: 밤 10시에 아직 안 한 것만 묶어 한 번, 11시 30분에 그래도 남았으면 한 번 더. 다 한 날은 울리지 않는다.
+    for (let i = 0; i < 7; i++) {
+      const day = addDays(today, i), left = routineRows(routines, day).filter(r => !r.done);
+      if (!left.length) continue;
+      const body = left.slice(0, 6).map(r => clip(r.title, 20)).join(', ') + (left.length > 6 ? ' 외 ' + (left.length - 6) + '개' : '');
+      push({ id: 'hn-routine-a-' + day, at: at(day, 22), title: '오늘 루틴 ' + left.length + '개가 남았어요', body });
+      push({ id: 'hn-routine-b-' + day, at: at(day, 23, 30), title: '자정 전 마지막 알림 · 루틴 ' + left.length + '개', body });
+    }
     const named = t => { const p = projectName(t.project); return p && p !== '분류 대기' ? p + ': ' + clip(t.title) : clip(t.title, 60); };
     for (const t of tasks) {
       const r = reminders[t.id];
@@ -65,6 +73,30 @@
     return out.sort((a, b) => a.at - b.at).slice(0, 60);
   }
 
+  /** 그날 해야 하는 루틴: [{id,title,days,done,streak}] 만든 순서대로. days: 'daily'·'weekdays'·요일 목록(0=일). */
+  function routineOn(r, day) {
+    const [y, mo, d] = day.split('-').map(Number), w = new Date(y, mo - 1, d).getDay();
+    return r.days === 'weekdays' ? w >= 1 && w <= 5 : Array.isArray(r.days) ? r.days.includes(w) : true;
+  }
+  function routineRows(routines, day) {
+    return Object.values(routines || {}).filter(r => r && !r.removed && typeof r.title === 'string' && routineOn(r, day))
+      .sort((a, b) => String(a.createdAt || '').localeCompare(String(b.createdAt || '')))
+      .map(r => ({ id: r.id, title: r.title, days: r.days, done: !!(r.done || {})[day], streak: streak(r, day) }));
+  }
+  /** 연속으로 한 날 수. 오늘 아직 안 했으면 어제까지 센다. 하지 않는 요일은 건너뛴다. */
+  function streak(r, day) {
+    const done = r.done || {};
+    let n = 0, cur = day;
+    if (!done[cur]) cur = addDays(cur, -1);
+    for (let i = 0; i < 400; i++, cur = addDays(cur, -1)) {
+      if (!routineOn(r, cur)) continue;
+      if (!done[cur]) break;
+      n++;
+    }
+    return n;
+  }
+  const daysLabel = days => days === 'weekdays' ? '평일' : Array.isArray(days) ? (days.length === 7 ? '매일' : days.map(d => '일월화수목금토'[d]).join('·')) : '매일';
+
   /** 알림에서 누른 단추 → 새 알림 시각. '1h' 한 시간 뒤, 'tomorrow' 내일 아침 9시. */
   function snooze(kind, now = Date.now()) {
     const d = kind === '1h' ? new Date(now + 3600000) : new Date(at(addDays(ymd(new Date(now)), 1), 9));
@@ -92,7 +124,7 @@
   }
   /** 앱이 예약 결과를 알려 준다: {permission:'authorized'|'denied'|..., scheduled:n, next:ms|null}. */
   const listeners = new Set();
-  const api = { plan, label, snooze, send, test, ymd, addDays, status: null, inApp: () => !!g.webkit?.messageHandlers?.hannonReminders, onStatus: fn => listeners.add(fn) };
+  const api = { plan, label, snooze, send, test, ymd, addDays, routineRows, daysLabel, status: null, inApp: () => !!g.webkit?.messageHandlers?.hannonReminders, onStatus: fn => listeners.add(fn) };
   g.hannonReminderStatus = s => { api.status = s; listeners.forEach(fn => { try { fn(s); } catch { /* 화면 쪽 오류는 무시 */ } }); };
   /** 상태 한 줄. 예: "알림 12개 예약됨 · 다음 11/3 18:00" */
   api.statusText = () => {

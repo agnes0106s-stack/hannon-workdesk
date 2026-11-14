@@ -463,6 +463,62 @@ function briefRow(text, meta, fn) {
   if (meta) row.append(el('span', 'brief-meta', meta));
   return row;
 }
+// 매일 루틴: 체크는 날마다 새로 시작한다. 밤 10시·11시 30분에 안 한 것만 알린다(알림 계획은 reminders.js, 맥과 같은 규칙).
+function routineCard() {
+  const RM = globalThis.HannonReminders, day = RM.ymd(new Date()), routines = store.choices().routines || {};
+  const all = Object.values(routines).filter(r => r && !r.removed), rows = RM.routineRows(routines, day), left = rows.filter(r => !r.done).length;
+  const card = briefCard('매일 루틴', 'check', all.length ? button('관리', 'text-button', manageRoutines) : null);
+  card.classList.add('routine-card');
+  if (rows.length) card.querySelector('h2').append(el('span', 'routine-count' + (left ? '' : ' clear'), left ? left + '개 남음' : '오늘 다 했어요'));
+  rows.forEach(r => {
+    const line = el('div', 'brief-task routine-row' + (r.done ? ' done' : '')), check = el('input', 'brief-check');
+    check.type = 'checkbox'; check.checked = r.done; check.setAttribute('aria-label', r.title + (r.done ? ' 했음 취소' : ' 했음으로 표시'));
+    check.addEventListener('change', () => { check.disabled = true; store.queue.enqueue('routineCheck', { id: r.id, day, done: check.checked }).catch(err => notify(err.message)); });
+    const meta = [RM.daysLabel(r.days) !== '매일' ? RM.daysLabel(r.days) : '', r.streak > 1 ? r.streak + '일째' : ''].filter(Boolean).join(' · ');
+    line.append(check, briefRow(r.title, meta, () => editRoutine(r)));
+    card.append(line);
+  });
+  if (all.length && !rows.length) card.append(el('p', 'small-empty', '오늘은 쉬는 날이에요.'));
+  const form = el('form', 'routine-add'), input = el('input'), add = el('button', 'text-button', '추가');
+  add.type = 'submit'; input.placeholder = all.length ? '루틴 추가' : '매일 할 일 (예: 운동)'; input.maxLength = 60; input.setAttribute('aria-label', '새 루틴');
+  form.append(input, add);
+  form.addEventListener('submit', e => {
+    e.preventDefault();
+    const title = input.value.trim();
+    if (!title) return;
+    store.queue.enqueue('routine', { id: 'rt-' + hex(5), title, days: 'daily' }).catch(err => notify(err.message));
+    notify('루틴을 추가했어요.' + offlineSuffix());
+  });
+  card.append(form);
+  if (all.length) card.append(el('p', 'routine-hint', '밤 10시와 11시 30분에, 안 한 것만 알려줘요.'));
+  return card;
+}
+function manageRoutines() {
+  const RM = globalThis.HannonReminders, body = openDialog('매일 루틴 관리');
+  Object.values(store.choices().routines || {}).filter(r => r && !r.removed).sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)))
+    .forEach(r => body.append(briefRow(r.title, RM.daysLabel(r.days) + ' · 고치기', () => editRoutine(r))));
+}
+function editRoutine(r) {
+  const body = openDialog('루틴 고치기'), title = el('input', 'routine-title');
+  title.value = r.title; title.maxLength = 60; title.setAttribute('aria-label', '루틴 이름');
+  const on = new Set(r.days === 'weekdays' ? [1, 2, 3, 4, 5] : Array.isArray(r.days) ? r.days : [0, 1, 2, 3, 4, 5, 6]), days = el('div', 'routine-days');
+  '일월화수목금토'.split('').forEach((name, i) => {
+    const b = button(name, 'filter' + (on.has(i) ? ' active' : ''), () => { on.has(i) ? on.delete(i) : on.add(i); b.classList.toggle('active', on.has(i)); b.setAttribute('aria-pressed', String(on.has(i))); });
+    b.setAttribute('aria-pressed', String(on.has(i)));
+    days.append(b);
+  });
+  const acts = el('div', 'dialog-buttons');
+  acts.append(button('저장', 'primary-button', () => {
+    const list = [...on].sort(), name = title.value.trim();
+    if (!name || !list.length) { notify('이름과 요일을 확인해 주세요.'); return; }
+    store.queue.enqueue('routine', { id: r.id, title: name, days: list.length === 7 ? 'daily' : list.join() === '1,2,3,4,5' ? 'weekdays' : list }).catch(err => notify(err.message));
+    closeDialog(); notify('루틴을 고쳤어요.' + offlineSuffix());
+  }), button('지우기', 'secondary-button task-remove', () => {
+    store.queue.enqueue('routine', { id: r.id, remove: true }).catch(err => notify(err.message));
+    closeDialog(); notify('루틴을 지웠어요.' + offlineSuffix());
+  }), button('닫기', 'text-button', closeDialog));
+  body.append(labeled('이름', title), el('p', 'dialog-section', '하는 요일'), days, acts);
+}
 function renderHome(c) {
   c.replaceChildren();
   if (state.query) { renderSearch(c); return; }
@@ -500,7 +556,7 @@ function renderHome(c) {
     follow.forEach(m => card.append(briefRow('📝 ' + m.title, (m.actions.length ? '챙길 일 ' + Math.min(m.actions.length, 5) + '개' : '결정 ' + m.decisions.length + '개') + ' · 할 일과 마감 정하기', () => showFollowup(m))));
     grid.append(card);
   }
-  grid.append(first, radar, meet);
+  grid.append(routineCard(), first, radar, meet);
   if (finals.length) grid.append(fin);
   c.append(grid);
 }
@@ -591,7 +647,7 @@ R.onStatus(() => { const t = $('#reminder-status-text'); if (t) t.textContent = 
 function scheduleReminders() {
   if (!store || CALENDAR_ONLY || !store.get(INDEX_PATH)) return;
   const choices = store.choices();
-  R.send(R.plan({ tasks: store.tasks().filter(t => taskState(choices, t.id) === 'pending'), reminders: choices.reminders || {}, followups: pendingFollowups(), projectName: id => projectOf(id).name }));
+  R.send(R.plan({ tasks: store.tasks().filter(t => taskState(choices, t.id) === 'pending'), reminders: choices.reminders || {}, routines: choices.routines || {}, followups: pendingFollowups(), projectName: id => projectOf(id).name }));
 }
 /** 앱이 알림에서 누른 단추를 넘긴다: done · 1h · tomorrow · open. */
 window.hannonReminderAction = (kind, taskId, meetingId) => {
